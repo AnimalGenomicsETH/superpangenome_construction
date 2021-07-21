@@ -2,11 +2,11 @@
 import os
 
 norep = 6
-listrep = list(range(1, norep + 1))
+listrep = list(range(2, norep + 1))
 nothresh = 20
 listthresh = list(range(1, nothresh + 1))
 listlin = ["delly", "manta"]
-listgraph = ["minigraph", "pggb", "cactus"]
+listgraph = ["minigraph", "pggb", "cactus","vglin"]
 listall = listlin + listgraph
 rundir = os.getcwd()
 
@@ -162,6 +162,38 @@ rule modify_graph:
         fi
 
         """
+
+#construct linear graph
+rule construct_graph_linear:
+        input: ref = "map_linear/25_OBV.fa"
+        output: "graph/vglin_{rep}/vglin_{rep}_mod.vg"
+        threads: 10
+        resources:
+           mem_mb= 2000,
+           walltime= "00:30"
+        shell:
+           """
+
+           vg construct -t {threads} -m 256 -r {input.ref} > {output}
+
+           """
+
+rule index_graph_linear:
+        input: 
+            graph = "graph/vglin_{rep}/vglin_{rep}_mod.vg"
+        output: 
+            xg = "graph/vglin_{rep}/vglin_{rep}_mod.xg",
+            gcsa = "graph/vglin_{rep}/vglin_{rep}_mod.gcsa"
+        threads: 10
+        resources:
+           mem_mb= 5000,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg index -t {threads} -x {output.xg} -g {output.gcsa} {input.graph}
+
+           """
 
 rule map_graph:
     input:
@@ -345,7 +377,7 @@ rule stat_map_graph:
         {input.xg} > {params.prefix}/tmp.gaf
 
         totalign=$(grep "Total alignments" $tmp1|cut -f3 -d" ")
-        prmap=$(grep "primary" $tmp1|cut -f3 -d" ")
+        prmap=$(grep "Total aligned" $tmp1|cut -f3 -d" ")
         unmap=$(( totalign-prmap ))
         mq0=$(awk '$12==0' {params.prefix}/tmp.gaf  |wc -l)
         mq10=$(awk '$12>=10' {params.prefix}/tmp.gaf  |wc -l)
