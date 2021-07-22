@@ -31,4 +31,5 @@ In `map_lr.smk` long-read data simulated with `pbsim2` of both Pacbio and ONT us
 - GraphAligner 1.0.13
 - ngmlr 0.2.7 
 - sniffles 1.0.12
+- SURVIVOR 1.0.7
 
