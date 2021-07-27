@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import os
 
-norep = 6
+norep = 2
 listrep = list(range(2, norep + 1))
-nothresh = 20
+nothresh = 1
 listthresh = list(range(1, nothresh + 1))
 listlin = ["delly", "manta"]
 listgraph = ["minigraph", "pggb", "cactus","vglin"]

@@ -1,6 +1,6 @@
 
 # config
-norep = 2
+norep = 1
 nothresh = 1
 listrep = list(range(1, norep + 1))
 listthresh = list(range(1, nothresh + 1))

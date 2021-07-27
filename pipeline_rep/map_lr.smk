@@ -4,7 +4,7 @@ listrep = list(range(2, norep + 1))
 nothresh = 20
 listthresh = list(range(1, nothresh + 1))
 rundir = os.getcwd()
-simtype = ["pacbio","ont"]
+simtype = ["pacbio","ont","hifi"]
 listlin = ["lin"]
 listgraph = ["minigraph", "pggb", "cactus"]
 listall = listlin + listgraph
@@ -45,8 +45,17 @@ rule simulate_long_read:
         echo "Simulate ONT data"
 
         pbsim2 --depth 20 \
-             --length-min 5000 --length-max 100000 \
+          --length-min 5000 --length-max 100000 \
           --hmm_model {params.hmm_model_ont}  --difference-ratio 23:31:46 \
+          --prefix simulated_lr/{wildcards.sim}_{wildcards.rep} \
+          {input.genome}
+        
+        elif [[ {wildcards.sim} == "hifi" ]]; then
+        echo "Simulate HiFi data"
+
+        pbsim2 --depth 20 \
+          --length-min 5000 --length-max 25000 \
+          --hmm_model {params.hmm_model_pacbio} --accuracy-mean 0.98  \
           --prefix simulated_lr/{wildcards.sim}_{wildcards.rep} \
           {input.genome}
 
