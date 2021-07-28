@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import os
 
-norep = 2
-listrep = list(range(2, norep + 1))
-nothresh = 1
+norep = 6
+listrep = list(range(2, norep + 1)) 
+#add non-var
+listrep.append(23)
+nothresh = 20
 listthresh = list(range(1, nothresh + 1))
 listlin = ["delly", "manta"]
 listgraph = ["minigraph", "pggb", "cactus","vglin"]
@@ -21,7 +23,7 @@ rule simulate_read:
     output:
         f1 = "sim_reads/simread_rep{rep}_1.fq",
         f2 = "sim_reads/simread_rep{rep}_2.fq",
-        tpos = "sim_reads/simread_rep{rep}_pos.sam"
+        #tpos = "sim_reads/simread_rep{rep}_pos.sam"
     threads: 10
     resources:
         mem_mb = 2000,

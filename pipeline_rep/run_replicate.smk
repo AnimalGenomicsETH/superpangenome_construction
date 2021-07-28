@@ -3,6 +3,7 @@
 norep = 1
 nothresh = 1
 listrep = list(range(1, norep + 1))
+listrep.append(23)
 listthresh = list(range(1, nothresh + 1))
 listgr = ["pggb","cactus","minigraph"]
 # listgr = ["minigraph", "pggb"]
