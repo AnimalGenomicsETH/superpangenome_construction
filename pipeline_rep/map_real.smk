@@ -5,8 +5,13 @@ assemb_list,=glob_wildcards(assemb_dir+"/assembly/{breed}_aut.fa")
 ref_genome="UCD"
 chromo_list=list(range(25,27))
 
+#for pggb 
+dirwork="/cluster/work/pausch/danang/psd/scratch/real_data"
+sifdir="/cluster/work/pausch/danang/psd/bin/sif"
+
 rule all:
-    input : expand("graph/minigraph/graph_{chromo}.gfa",chromo=chromo_list)
+    input : expand("graph/minigraph/graph_{chromo}.gfa",chromo=chromo_list),
+            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa",chromo=chromo_list)
 
 rule sketch_assembly:
     input : "assembly/{assemb}_aut.fa"
@@ -111,3 +116,38 @@ rule run_minigraph:
         minigraph -t {threads} -xggs {params.order_list} > {output}
 
         """
+
+localrules: combine_genome
+rule combine_genome:
+        input:expand("assembly/{{chromo}}/{breed}_{{chromo}}.fa",breed=assemb_list)
+        output:"comb_chromo/{chromo}_comb.fa"
+        shell:
+           """
+
+           cat {input} > {output}
+
+           """
+
+rule construct_pggb:
+    input:
+        "comb_chromo/{chromo}_comb.fa"
+    output:
+        "graph/pggb_{chromo}/pggb_{chromo}.gfa"
+    threads: 32
+    resources:
+        mem_mb = 2000,
+        walltime = "04:00"
+    params:
+        sifdir = sifdir,
+        dirwork = dirwork
+    shell:
+        """
+
+        singularity run --bind {params.dirwork} {params.sifdir}/pggb.sif \
+        'pggb -i {input} -t {threads} -s 100000 -p 90 -n 10 \
+        -S -o graph/pggb_{wildcards.chromo}'
+
+        ln -s --relative graph/pggb_{wildcards.chromo}/*.smooth.gfa {output}
+
+        """
+
