@@ -111,7 +111,6 @@ if __name__ == "__main__":
     input_file.close()
 
     # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
-    print(ref)
     print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
     print(graph, grtype, "edges", *edge_calc(edge_cum, node_cum), file=outfile)
     outfile.close()
