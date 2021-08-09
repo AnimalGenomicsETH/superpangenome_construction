@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+from os import lseek
 
 def parse_args():
         parser = argparse.ArgumentParser(description = __doc__,
@@ -24,6 +25,7 @@ if __name__ == "__main__":
             else:
                 outfile.write(line)
                      
+
 
 
         
