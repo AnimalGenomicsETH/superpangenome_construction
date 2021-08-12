@@ -2,7 +2,9 @@
 """
 This script used to add ref-assembly name in GFA file, it adds "_UCD" in contig name
 """
-with open("graph_pggb_chop_test.gfa") as infile, open("gfa_fixed.gfa","w") as outfile:
+import sys
+
+with open(sys.argv[1]) as infile, open(sys.argv[2],"w") as outfile:
     for line in infile:
         token=line.strip().split()
         if line.startswith("P"):

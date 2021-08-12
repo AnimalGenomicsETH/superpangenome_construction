@@ -5,11 +5,12 @@ assemb_list, = glob_wildcards(assemb_dir + "/assembly/{breed}_aut.fa")
 ref_genome = "UCD"
 chromo_list = list(range(1, 30))
 impgr_list=['hg','pg','og','vg','gfa','xg']
+index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 
 
 #graph prog
 # prog_list=["minigraph","pggb"]
-prog_list=["pggb"]
+prog_list=["pggb",'minigraph']
 
 # for pggb
 dirwork = "/cluster/work/pausch/danang/psd/scratch/real_data"
@@ -18,9 +19,10 @@ sifdir = "/cluster/work/pausch/danang/psd/bin/sif"
 rule all:
     input: expand("graph/minigraph/graph_{chromo}.gfa", chromo=chromo_list),
            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa", chromo=chromo_list),
-           expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
+           #expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
-           expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
+           #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
+           expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list)
             
 
 rule sketch_assembly:
@@ -143,7 +145,8 @@ rule combine_minigraph:
     input:  expand("graph/minigraph/graph_{chromo}_path.vg",chromo=chromo_list)
     output: 
         full_graph="graph/minigraph/graph_minigraph.vg",
-        chop_graph="graph/minigraph/graph_minigraph_chop.vg"
+        chop_graph="graph/minigraph/graph_minigraph_chop.vg",
+        chop_graph_gfa="graph/minigraph/graph_minigraph_chop.gfa"
     threads: 10
     resources:
         mem_mb = 2000,
@@ -154,6 +157,8 @@ rule combine_minigraph:
         vg combine {input} > {output.full_graph}
 
         vg mod -X 256 {output.full_graph} > {output.chop_graph}
+
+        vg convert -t {threads} -f {output.chop_graph} > {output.chop_graph_gfa} 
 
         """
 
@@ -248,3 +253,105 @@ rule chop_pggb:
         vg mod -t {threads} -X 1000 {input} > {output.chop_graph}
        
         """
+
+#indexing require for giraffe mapping 
+
+#- xg : `vg convert -x -g gfa_fixed.gfa > testreg.xg`
+#- gbwt (.giraffe.gbwt): `vg gbwt  -G gfa_fixed.gfa  --path-regex '(.*)_(.*)' --path-fields _CS -o testreg.gbwt`
+#- gbwt graph (.gg): `vg gbwt -g testreg.gg -x testreg.xg testreg.gbwt` 
+#- minimizer (.min): `vg minimizer -t 32 -g testreg.giraffe.gbwt -i testreg.min testreg.xg`
+#- snarl (.snarl): `vg snarls -t 32 -T testreg.xg > testreg.snarls`
+#- distance (.dist) : build from minimizer and snarl `vg index -t 32 testreg.xg -s testreg.snarls -j testreg.dist`
+
+rule create_index_xg:
+        input: "graph/{prog}/graph_{prog}_chop.gfa"
+        output: "graph/{prog}/graph_{prog}.xg"
+        threads: 32
+        resources:
+           mem_mb= 2000 ,
+           walltime= "01:00"
+        params:
+        shell:
+           """
+
+           vg convert -t {threads} -x -g {input} > {output}
+
+           """
+
+rule create_index_gbwt:
+        input: "graph/{prog}/graph_{prog}_chop.gfa"
+        output: "graph/{prog}/graph_{prog}.giraffe.gbwt"
+        threads: 32
+        resources:
+           mem_mb= 2000 ,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg gbwt -G {input} \
+           --path-regex '(.*)_(.*)' --path-fields _CS \
+           -o {output}
+
+           """
+
+rule create_gbwt_graph:
+        input: 
+            xg="graph/{prog}/graph_{prog}.xg",
+            gbwt="graph/{prog}/graph_{prog}.giraffe.gbwt"
+        output: "graph/{prog}/graph_{prog}.gg"
+        threads: 32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg gbwt -g {output} -x {input.xg} {input.gbwt}
+
+           """
+
+rule create_index_minimizer:
+        input:
+            xg="graph/{prog}/graph_{prog}.xg",
+            gbwt="graph/{prog}/graph_{prog}.giraffe.gbwt"
+        output: "graph/{prog}/graph_{prog}.min"
+        threads: 32
+        resources:
+           mem_mb= 2000 ,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg minimizer -t {threads} -g {input.gbwt} -i {output} {input.xg}
+
+           """
+
+rule identify_snarl:
+        input: "graph/{prog}/graph_{prog}.xg"
+        output: "graph/{prog}/graph_{prog}.snarl"
+        threads: 32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg snarls -t {threads} -T {input} > {output}
+
+           """
+
+rule create_index_distance:
+        input: xg="graph/{prog}/graph_{prog}.xg",
+               snarl="graph/{prog}/graph_{prog}.snarl"
+        output:"graph/{prog}/graph_{prog}.dist"
+        threads: 32
+        resources:
+           mem_mb= 2000 ,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg index -t {threads} {input.xg} \
+            -s {input.snarl} -j {output}
+
+           """

@@ -14,7 +14,6 @@ The pipelines work as follow:
 
 Assembly name: whole genome autosomes `Angus_aut.fa`. Should be capitalized and with underscore. *Tested only on autosome*
 
-Contig name: Should be unique, advised to use the sample identifier in the contig name. For reference backbone, you can use numeric assigned (1-29). 
-To add sample identifier you can use `fa_renamer.py`. 
+Contig name: Should be formatted as `{contig}_{sample}` otherwise the haplotype/paths information is not correct in the `gbwt` index. If your fasta already with contig name you can add sample identifier with  `fa_renamer.py -i {input} -s {sample_name} -o {output}`. 
 
 
