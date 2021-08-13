@@ -16,13 +16,20 @@ prog_list=["pggb",'minigraph']
 dirwork = "/cluster/work/pausch/danang/psd/scratch/real_data"
 sifdir = "/cluster/work/pausch/danang/psd/bin/sif"
 
+#for mapping
+anim_list=["BSWCHEM110294048847"]
+fastq_dir="/cluster/work/pausch/inputs/fastq/BTA"
+
+
 rule all:
     input: expand("graph/minigraph/graph_{chromo}.gfa", chromo=chromo_list),
            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa", chromo=chromo_list),
            #expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
-           expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list)
+           expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
+           expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list),
+           expand("mapped/{prog}_{anim}_mapping_stat.tsv",prog=prog_list,anim=anim_list)
             
 
 rule sketch_assembly:
@@ -355,3 +362,47 @@ rule create_index_distance:
             -s {input.snarl} -j {output}
 
            """
+
+#mapping with giraffe 
+rule giraffe_mapping:
+        input:
+            xg="graph/${prog}/graph_{prog}.xg",
+            gg="graph/${prog}/graph_{prog}.gg",
+            gbwt="graph/${prog}/graph_{prog}.giraffe.gbwt",
+            mini="graph/${prog}/graph_{prog}.min",
+            dist="graph/${prog}/graph_{prog}.dist",
+            r1=fastq_dir + "/{anim}_R1.fastq.gz",
+            r2=fastq_dir + "/{anim}_R2.fastq.gz"
+        output:"mapped/{prog}_{anim}.gam"
+        threads:32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        params:
+            fastq_dir=fastq_dir
+        shell:
+           """
+
+           vg giraffe -t {threads} \
+           -x {input.xg} \
+           -g {input.gg} \
+           -H {input.gbwt} \
+           -m {input.mini} \
+           -d {input.dist} \
+           -p -f {input.r1} -f {input.r2} > {output}
+
+           """
+
+rule graph_mapping_statistics:
+        input:"mapped/{prog}_{anim}.gam"
+        output:"mapped/{prog}_{anim}_mapping_stat.tsv"
+        threads:10
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        shell:
+           """
+        
+            vg stats -a {input} > {output}
+           
+           """   
