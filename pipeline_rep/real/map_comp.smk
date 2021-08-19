@@ -10,7 +10,7 @@ index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 
 #graph prog
 # prog_list=["minigraph","pggb"]
-prog_list=["pggb",'minigraph']
+prog_list=["pggb",'minigraph','linear']
 
 # for pggb
 dirwork = "/cluster/work/pausch/danang/psd/scratch/real_data"
@@ -21,6 +21,18 @@ anim_list=["BSWCHEM110294048847"]
 fastq_dir="/cluster/work/pausch/inputs/fastq/BTA"
 
 
+
+#toggle for optional analysis, change 0 to 1 to run respective analysis
+run_mapping=1
+
+def optional_output(run_mapping):
+    opt_out=[]
+    if run_mapping:
+        opt_out.extend(expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list)),
+        opt_out.extend(expand("mapped/{prog}_{anim}_mapping_stat.tsv",prog=prog_list,anim=anim_list))
+    return opt_out
+
+
 rule all:
     input: expand("graph/minigraph/graph_{chromo}.gfa", chromo=chromo_list),
            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa", chromo=chromo_list),
@@ -28,9 +40,7 @@ rule all:
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
            expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
-           expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list),
-           expand("mapped/{prog}_{anim}_mapping_stat.tsv",prog=prog_list,anim=anim_list)
-            
+           optional_output(run_mapping)
 
 rule sketch_assembly:
     input: "assembly/{assemb}_aut.fa"
@@ -261,6 +271,7 @@ rule chop_pggb:
        
         """
 
+
 #indexing require for giraffe mapping 
 
 #- xg : `vg convert -x -g gfa_fixed.gfa > testreg.xg`
@@ -406,3 +417,6 @@ rule graph_mapping_statistics:
             vg stats -a {input} > {output}
            
            """   
+
+
+
