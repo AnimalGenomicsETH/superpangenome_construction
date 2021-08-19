@@ -10,7 +10,9 @@ index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 
 #graph prog
 # prog_list=["minigraph","pggb"]
-prog_list=["pggb",'minigraph','linear']
+# prog_list=["pggb",'minigraph','linear']
+prog_list=["pggb",'minigraph']
+
 
 # for pggb
 dirwork = "/cluster/work/pausch/danang/psd/scratch/real_data"
@@ -28,8 +30,9 @@ run_mapping=1
 def optional_output(run_mapping):
     opt_out=[]
     if run_mapping:
-        opt_out.extend(expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list)),
-        opt_out.extend(expand("mapped/{prog}_{anim}_mapping_stat.tsv",prog=prog_list,anim=anim_list))
+        #opt_out.extend(expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list)),
+        opt_out.extend(expand("mapped/{prog}_{anim}_mapping_stat_up.tsv",prog=prog_list,anim=anim_list)),
+        opt_out.extend(expand("mapped/{prog}_{anim}_up.gam",prog=prog_list,anim=anim_list))
     return opt_out
 
 
@@ -377,11 +380,11 @@ rule create_index_distance:
 #mapping with giraffe 
 rule giraffe_mapping:
         input:
-            xg="graph/${prog}/graph_{prog}.xg",
-            gg="graph/${prog}/graph_{prog}.gg",
-            gbwt="graph/${prog}/graph_{prog}.giraffe.gbwt",
-            mini="graph/${prog}/graph_{prog}.min",
-            dist="graph/${prog}/graph_{prog}.dist",
+            xg="graph/{prog}/graph_{prog}.xg",
+            gg="graph/{prog}/graph_{prog}.gg",
+            gbwt="graph/{prog}/graph_{prog}.giraffe.gbwt",
+            mini="graph/{prog}/graph_{prog}.min",
+            dist="graph/{prog}/graph_{prog}.dist",
             r1=fastq_dir + "/{anim}_R1.fastq.gz",
             r2=fastq_dir + "/{anim}_R2.fastq.gz"
         output:"mapped/{prog}_{anim}.gam"
@@ -404,9 +407,57 @@ rule giraffe_mapping:
 
            """
 
+
+#updated indexing in version 1.34 
+#this combine gbwt and gg into gbz file 
+
+rule create_gbz_index:
+        input: 
+            xg="graph/{prog}/graph_{prog}.xg",
+            gbwt="graph/{prog}/graph_{prog}.giraffe.gbwt"
+        output:"graph/{prog}/graph_{prog}.giraffe.gbz"
+        threads: 10
+        resources:
+           mem_mb= 5000 ,
+           walltime= "04:00"
+        shell:
+           """
+
+            vg gbwt --gbz-format -g {output} -x {input.xg} {input.gbwt}
+
+           """
+
+#mapping with giraffe 
+rule giraffe_mapping_updated:
+        input:
+            xg="graph/{prog}/graph_{prog}.xg",
+            gbz="graph/{prog}/graph_{prog}.giraffe.gbz",
+            mini="graph/{prog}/graph_{prog}.min",
+            dist="graph/{prog}/graph_{prog}.dist",
+            r1=fastq_dir + "/{anim}_R1.fastq.gz",
+            r2=fastq_dir + "/{anim}_R2.fastq.gz"
+        output:"mapped/{prog}_{anim}_up.gam"
+        threads:32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        params:
+            fastq_dir=fastq_dir
+        shell:
+           """
+
+           vg giraffe -t {threads} \
+           -x {input.xg} \
+           -Z {input.gbz} \
+           -m {input.mini} \
+           -d {input.dist} \
+           -p -f {input.r1} -f {input.r2} > {output}
+
+           """
+
 rule graph_mapping_statistics:
-        input:"mapped/{prog}_{anim}.gam"
-        output:"mapped/{prog}_{anim}_mapping_stat.tsv"
+        input:"mapped/{prog}_{anim}_up.gam"
+        output:"mapped/{prog}_{anim}_mapping_stat_up.tsv"
         threads:10
         resources:
            mem_mb= 2000,
