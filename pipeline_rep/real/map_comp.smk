@@ -469,5 +469,3 @@ rule graph_mapping_statistics:
            
            """   
 
-
-

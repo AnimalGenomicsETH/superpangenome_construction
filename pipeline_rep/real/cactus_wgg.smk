@@ -14,10 +14,15 @@ scrdir="/cluster/scratch/cdanang/scr_cac"
 
 
 rule all:
-    input: expand("graph/cactus/{chromo}/seqfile_{chromo}.txt",chromo=chromo_list),
-           expand("graph/cactus/{chromo}/seqfile_{chromo}_masked.txt",chromo=chromo_list),
-           expand("graph/cactus/{chromo}/cactus_{chromo}.paf",chromo=chromo_list),
-           expand("graph/cactus/{chromo}/{anim}_{chromo}_masked.fa",anim=assemb_list,chromo=chromo_list)
+    input: #expand("graph/cactus/{chromo}/seqfile_{chromo}.txt",chromo=chromo_list),
+           #expand("graph/cactus/{chromo}/seqfile_{chromo}_masked.txt",chromo=chromo_list),
+           #expand("graph/cactus/{chromo}/cactus_{chromo}.paf",chromo=chromo_list),
+           #expand("graph/cactus/{chromo}/{anim}_{chromo}_masked.fa",anim=assemb_list,chromo=chromo_list),
+           #expand("graph/cactus/{chromo}/cactus_masked_{chromo}.paf",chromo=chromo_list),
+           #expand("graph/cactus/{chromo}/cactus_{chromo}.vg",chromo=chromo_list),
+           "graph/cactus/cactus_combined.vg",
+           "graph/cactus/cactus_combined.gfa",
+           "combine_finished.tsv"
 
 localrules: create_seq_file 
 rule create_seq_file:
@@ -100,3 +105,127 @@ rule cactus_preprocess_masked:
 
            """
 
+rule cactus_preprocess_align:
+        input:
+            seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_masked.txt",
+            graph="graph/minigraph/graph_{chromo}.gfa",
+        output:
+            paf="graph/cactus/{chromo}/cactus_masked_{chromo}.paf"
+        threads: 32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        params:
+            prefix="graph/cactus/{chromo}",
+            anims=assemb_list,
+            chromo="{chromo}"
+        shell:
+           """
+
+           source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+           export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+           export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+        
+    
+           cactus-graphmap $PWD/{wildcards.chromo}_src_masked \
+           {input.seqfile_masked} \
+           {input.graph} {output.paf} \
+           --maskFilter 100000 \
+           --outputFasta {params.prefix}/cactus_masked_{wildcards.chromo}.fa \
+           --realTimeLogging
+
+           """
+    
+rule cactus_align:
+        input:
+              seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_masked.txt",
+              paf="graph/cactus/{chromo}/cactus_masked_{chromo}.paf"
+        output:
+              gfa="graph/cactus/{chromo}/cactus_{chromo}.gfa.gz",
+              hal="graph/cactus/{chromo}/cactus_{chromo}.hal",
+              vg="graph/cactus/{chromo}/cactus_{chromo}.vg"
+        threads:32
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        params: 
+           ref = ref_genome
+        shell:
+           """
+
+           source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+           export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+           export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+
+           cactus-align $PWD/{wildcards.chromo}_src_align \
+           {input.seqfile_masked} \
+           {input.paf} {output.hal} \
+           --pangenome --pafInput \
+           --realTimeLogging \
+           --outGFA --outVG --reference {wildcards.chromo}_{params.ref}
+
+           """
+
+rule cactus_drop_paths:
+        input:"graph/cactus/{chromo}/cactus_{chromo}.vg"
+        output:"graph/cactus/{chromo}/cactus_drop_{chromo}.vg"
+        threads:10
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        params:
+        shell:
+           """
+            
+          vg paths -Q _MINIGRAPH -d -v {input} > {output}
+
+           """
+
+rule cactus_combine:
+        input:expand("graph/cactus/{chromo}/cactus_drop_{chromo}.vg",chromo=chromo_list)
+        output:"graph/cactus/cactus_combined.vg"
+        threads:10
+        resources:
+           mem_mb= 5000,
+           walltime= "04:00"
+        params:
+        shell:
+           """
+            
+            vg combine {input} > {output}
+
+           """
+
+rule cactus_convert_gfa:
+        input:"graph/cactus/cactus_combined.vg"
+        output:"graph/cactus/cactus_combined.gfa"
+        threads:10
+        resources:
+           mem_mb= 5000,
+           walltime= "04:00"
+        shell:
+           """
+
+           vg convert -t {threads} -f {input} > {output}
+           """
+
+rule cactus_graphmap_join:
+        input:
+            hal=expand("graph/cactus/{chromo}/cactus_{chromo}.hal",chromo=chromo_list),
+            vg=expand("graph/cactus/{chromo}/cactus_{chromo}.vg",chromo=chromo_list)
+        output:touch("combine_finished.tsv")
+        threads:32
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        shell:
+           """
+
+           source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+           export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+           export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+
+           cactus-graphmap-join $PWD/src_combine --outDir $PWD/graph/cactus_combine \
+           --outName cactus_comb --reference UCD --realTimeLogging --clipLength 100000 --wlineSep . \
+           --vg {input.vg} 
+           """

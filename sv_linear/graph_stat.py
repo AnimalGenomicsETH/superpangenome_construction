@@ -73,7 +73,11 @@ if __name__ == "__main__":
     ref = args.ref
     # path in cactus is doubled from contig name
     if grtype == "cactus":
-        ref = args.ref + "." + args.ref
+        ref = []
+        #ref = args.ref + "." + args.ref
+        for comp in args.ref:
+            ref.append(str(comp) + "." + str(comp))
+
     output_file = args.output
 
     outfile = open(output_file, "w")
