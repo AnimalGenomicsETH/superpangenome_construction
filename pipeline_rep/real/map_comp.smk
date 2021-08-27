@@ -23,16 +23,20 @@ anim_list=["BSWCHEM110294048847"]
 fastq_dir="/cluster/work/pausch/inputs/fastq/BTA"
 
 
-
 #toggle for optional analysis, change 0 to 1 to run respective analysis
 run_mapping=1
+run_cactus=1
 
-def optional_output(run_mapping):
+def optional_output(run_mapping,run_cactus):
     opt_out=[]
     if run_mapping:
         #opt_out.extend(expand("mapped/{prog}_{anim}.gam",prog=prog_list,anim=anim_list)),
         opt_out.extend(expand("mapped/{prog}_{anim}_mapping_stat_up.tsv",prog=prog_list,anim=anim_list)),
         opt_out.extend(expand("mapped/{prog}_{anim}_up.gam",prog=prog_list,anim=anim_list))
+    if run_cactus:
+        opt_out.append("graph/cactus/cactus_combined.vg"),
+        opt_out.append("graph/cactus/cactus_combined.vg"),
+        opt_out.append("combine_finished.tsv")
     return opt_out
 
 
@@ -43,7 +47,7 @@ rule all:
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
            expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
-           optional_output(run_mapping)
+           optional_output(run_mapping,run_cactus)
 
 rule sketch_assembly:
     input: "assembly/{assemb}_aut.fa"
@@ -273,6 +277,10 @@ rule chop_pggb:
         vg mod -t {threads} -X 1000 {input} > {output.chop_graph}
        
         """
+
+
+#cactus pipeline
+include: "cactus_pipe.smk"       
 
 
 #indexing require for giraffe mapping 

@@ -76,7 +76,11 @@ if __name__ == "__main__":
         ref = []
         #ref = args.ref + "." + args.ref
         for comp in args.ref:
-            ref.append(str(comp) + "." + str(comp))
+            # this is little hack
+            # TODO: formalize ref name
+            ref_cac = str(comp) + "_UCD." + str(comp)
+            print(ref_cac)
+            ref.append(ref_cac)
 
     output_file = args.output
 

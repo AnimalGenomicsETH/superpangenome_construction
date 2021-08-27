@@ -1,28 +1,8 @@
 #!/usr/bin/env python
-
-assemb_dir = "/cluster/work/pausch/danang/psd/scratch/real_data"
-assemb_list, = glob_wildcards(assemb_dir + "/assembly/{breed}_aut.fa")
-
-ref_genome = "UCD"
-chromo_list = list(range(1, 30))
-
-dirwork = "/cluster/work/pausch/danang/psd/scratch/sim/sim_rep2"
 scrdir="/cluster/scratch/cdanang/scr_cac"
-
 #make it chromosome-by-chromosome 
 #this use input GFA from minigraph, aligned, and masked in a single pre-process step 
 
-
-rule all:
-    input: #expand("graph/cactus/{chromo}/seqfile_{chromo}.txt",chromo=chromo_list),
-           #expand("graph/cactus/{chromo}/seqfile_{chromo}_masked.txt",chromo=chromo_list),
-           #expand("graph/cactus/{chromo}/cactus_{chromo}.paf",chromo=chromo_list),
-           #expand("graph/cactus/{chromo}/{anim}_{chromo}_masked.fa",anim=assemb_list,chromo=chromo_list),
-           #expand("graph/cactus/{chromo}/cactus_masked_{chromo}.paf",chromo=chromo_list),
-           #expand("graph/cactus/{chromo}/cactus_{chromo}.vg",chromo=chromo_list),
-           "graph/cactus/cactus_combined.vg",
-           "graph/cactus/cactus_combined.gfa",
-           "combine_finished.tsv"
 
 localrules: create_seq_file 
 rule create_seq_file:
