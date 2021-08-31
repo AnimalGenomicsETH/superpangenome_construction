@@ -210,3 +210,28 @@ rule cactus_graphmap_join:
            --vg {input.vg} 
            """
 
+rule chop_cactus:
+        input:"graph/cactus/cactus_combined.vg"
+        output:"graph/cactus/cactus_combined_chop.vg"
+        threads:10
+        resources:
+           mem_mb= 5000,
+           walltime= "04:00"
+        shell:
+           """
+
+            vg mod -t {threads} -X 1000 {input} > {output}
+
+           """
+
+rule convert_cactus_chop_gfa:
+        input:"graph/cactus/cactus_combined_chop.vg"
+        output:"graph/cactus/graph_cactus_chop.gfa"
+        threads:10
+        resources:
+           mem_mb= 5000,
+           walltime= "04:00"
+        shell:
+           """
+            vg convert -f {input} > {output}
+           """

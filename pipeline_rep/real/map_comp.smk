@@ -11,7 +11,7 @@ index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 #graph prog
 # prog_list=["minigraph","pggb"]
 # prog_list=["pggb",'minigraph','linear']
-prog_list=["pggb",'minigraph']
+prog_list=["pggb",'minigraph','cactus']
 
 
 # for pggb
@@ -35,8 +35,10 @@ def optional_output(run_mapping,run_cactus):
         opt_out.extend(expand("mapped/{prog}_{anim}_up.gam",prog=prog_list,anim=anim_list))
     if run_cactus:
         opt_out.append("graph/cactus/cactus_combined.vg"),
-        opt_out.append("graph/cactus/cactus_combined.vg"),
-        opt_out.append("combine_finished.tsv")
+        opt_out.append("graph/cactus/cactus_combined.gfa"),
+        opt_out.append("graph/cactus/cactus_combined_chop.vg"),
+        opt_out.append("graph/cactus/graph_cactus_chop.gfa"),
+        #opt_out.append("combine_finished.tsv")
     return opt_out
 
 
@@ -317,9 +319,11 @@ rule create_index_gbwt:
         shell:
            """
 
-           vg gbwt -G {input} \
-           --path-regex '(.*)_(.*)' --path-fields _CS \
-           -o {output}
+        #    vg gbwt -G {input} \
+        #    --path-regex '(.*)_(.*)' --path-fields _CS \
+        #    -o {output}
+
+           vg gbwt --index-paths -x {input} -o {output}
 
            """
 

@@ -38,6 +38,31 @@ def node_calc(node_cum):
     return total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len
 
 
+def small_node_calc(node_cum):
+    total_node = 0
+    len_node = 0
+    ref_node = 0
+    ref_node_len = 0
+    non_ref_node = 0
+    non_ref_node_len = 0
+
+    for key, value in node_cum.items():
+        if value.nodelen < 50:
+            id = value.id
+            nodelen = value.nodelen
+            rtype = value.rtype
+
+            total_node += 1
+            len_node += nodelen
+            if rtype:
+                ref_node += 1
+                ref_node_len += nodelen
+            else:
+                non_ref_node += 1
+                non_ref_node_len += nodelen
+    return total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len
+
+
 def edge_calc(edge_cum, node_cum):
     total_rr = 0
     total_rn = 0
@@ -121,4 +146,5 @@ if __name__ == "__main__":
     # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
     print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
     print(graph, grtype, "edges", *edge_calc(edge_cum, node_cum), file=outfile)
+    print(graph, grtype, "small_nodes", *small_node_calc(node_cum), file=outfile)
     outfile.close()
