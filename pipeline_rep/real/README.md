@@ -17,3 +17,6 @@ Assembly name: whole genome autosomes `Angus_aut.fa`. Should be capitalized and 
 Contig name: Should be formatted as `{contig}_{sample}` otherwise the haplotype/paths information is not correct in the `gbwt` index. If your fasta already with contig name you can add sample identifier with  `fa_renamer.py -i {input} -s {sample_name} -o {output}`. 
 
 
+### Pipeline scheme (*In progress*)
+
+![Pipeline real data](pipe_real.png)
