@@ -51,7 +51,7 @@ rule combine_per_chromo_minigraph_sv:
 
            #1       137187  138168  >s39    >s41    >s40:981:+:1:137180:138188
 
-          paste <(awk '{{ print $1,$2,$3,$4 }}' {params.ref_bed}) \
+          paste <(awk '{{ print $1,$2,$3,$4,$5 }}' {params.ref_bed}) \
           <(awk '{{ L[FNR]=L[FNR] $NF "\\t" }} END {{ for(i=1;i<=FNR;i++)print L[i] }}' {input}) >> {output} 
 
            """
