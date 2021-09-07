@@ -2,6 +2,8 @@
 import argparse
 import gzip
 from dataclasses import dataclass
+from collections import defaultdict
+import re
 
 
 def parse_args():
@@ -10,6 +12,8 @@ def parse_args():
     parser.add_argument("-g", "--graph", help="graph to calculate statistics", required=True)
     parser.add_argument("-o", "--output", help="where to put the statistics", required=True)
     parser.add_argument("-r", "--ref", help="reference path", required=True, nargs='+')
+    # TODO: need to work on this, to generalize, now using regex from contig name 
+    parser.add_argument("-n", "--nonref", help="non-reference path sample", nargs='+')
     parser.add_argument("-t", "--grtype", help="type of graph", choices=["cactus", "pggb", "minigraph"], required=True)
     return parser.parse_args()
 
@@ -83,6 +87,32 @@ def edge_calc(edge_cum, node_cum):
             total_nn += 1
     return total_edges, total_rr, total_rn, total_nn
 
+def core_flexible_calc(node_count,breed_count,node_cum):
+    node_tally = defaultdict(int)
+    nodelen_tally = defaultdict(int)
+    # max_path = 0
+    # node count is node id, no path
+    for key,values in node_count.items():
+        node_tally[int(values)] += 1
+        nodelen = node_cum[key].nodelen
+        nodelen_tally[int(values)] += nodelen
+        # if int(values) > max_path:
+        #     max_path = int(values)
+
+    # for node count
+    core_genome = node_tally[breed_count]
+    private_genome = node_tally[1]
+    flexible_genome = sum([value for key,value in node_tally.items() if key > 1 and key < breed_count ])
+    all_node = sum(node_tally.values())
+
+    # for node len
+    core_len = nodelen_tally[breed_count]
+    private_len = nodelen_tally[1]
+    flexible_len = sum([value for key,value in nodelen_tally.items() if key > 1 and key < breed_count ])
+    all_len = sum(nodelen_tally.values())
+    
+
+    return core_genome, private_genome, flexible_genome, all_node, core_len, private_len, flexible_len, all_len
 
 @dataclass
 class node_stats:
@@ -115,6 +145,8 @@ if __name__ == "__main__":
     #node_stats = namedtuple("node_stats", ["id", "nodelen", "rtype"])
 
     edge_cum = list()
+    node_count = defaultdict(int)
+    all_breed = set()
 
     if graph[-2:] == "gz":
         input_file = gzip.open(graph, "rt")
@@ -141,10 +173,26 @@ if __name__ == "__main__":
                 for comp in line_comp[2].split(","):
                     node_comp = comp[:-1]
                     node_cum[node_comp].rtype = 1
+
+            ## core-flexible analysis
+            ## need to deal with the non-ref path 
+            # use this regex
+            # re.findall(pattern=r"[A-Za-z]+",string="1_Brahman")
+            path_info = line_comp[1] 
+            # add breed info 
+            node_breed = re.findall(pattern=r"[A-Za-z]+",string=path_info)[0]
+            all_breed.add(node_breed)
+            if not re.search(pattern=re.compile('minigraph',re.IGNORECASE),string=path_info):
+                for comp in line_comp[2].split(","):
+                     node_comp = comp[:-1]
+                     node_count[node_comp] += 1
+
     input_file.close()
 
     # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
     print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
     print(graph, grtype, "edges", *edge_calc(edge_cum, node_cum), file=outfile)
     print(graph, grtype, "small_nodes", *small_node_calc(node_cum), file=outfile)
+    print(graph, grtype, "core-flexible_analysis", *core_flexible_calc(node_count,len(all_breed),node_cum), file=outfile)
     outfile.close()
+
