@@ -11,6 +11,7 @@ index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 #graph prog
 # prog_list=["minigraph","pggb"]
 # prog_list=["pggb",'minigraph','linear']
+# prog_list=["pggb",'minigraph','cactus']
 prog_list=["pggb",'minigraph','cactus']
 
 
@@ -49,7 +50,9 @@ rule all:
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
            expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
-           optional_output(run_mapping,run_cactus)
+           optional_output(run_mapping,run_cactus),
+           expand("graph/{prog}/graph_{prog}_stat.tsv",prog=prog_list),
+           
 
 rule sketch_assembly:
     input: "assembly/{assemb}_aut.fa"
@@ -171,6 +174,7 @@ rule combine_minigraph:
     input:  expand("graph/minigraph/graph_{chromo}_path.vg",chromo=chromo_list)
     output: 
         full_graph="graph/minigraph/graph_minigraph.vg",
+        full_graph_gfa="graph/minigraph/graph_minigraph_combined.gfa",
         chop_graph="graph/minigraph/graph_minigraph_chop.vg",
         chop_graph_gfa="graph/minigraph/graph_minigraph_chop.gfa"
     threads: 10
@@ -182,9 +186,12 @@ rule combine_minigraph:
         
         vg combine {input} > {output.full_graph}
 
+        vg convert -f {output.full_graph} > {output.full_graph_gfa}
+
         vg mod -X 256 {output.full_graph} > {output.chop_graph}
 
-        vg convert -t {threads} -f {output.chop_graph} > {output.chop_graph_gfa} 
+        vg convert -t {threads} -f {output.chop_graph} > {output.chop_graph_gfa}
+ 
 
         """
 
@@ -265,6 +272,18 @@ rule combine_pggb:
         """
 
 
+rule convert_pggb_gfa:
+        input: "graph/pggb/graph_pggb_test.gfa",
+        output: "graph/pggb/graph_pggb_combined.gfa"
+        threads: 1
+        resources:
+           mem_mb=1000 ,
+           walltime= "01:00"
+        shell:
+           """
+            ln -s {input} > {output}
+           """
+
 rule chop_pggb:
     input:  "graph/pggb/graph_pggb_test.{impgr}"
     output: 
@@ -284,6 +303,24 @@ rule chop_pggb:
 #cactus pipeline
 include: "cactus_pipe.smk"       
 
+
+
+## statistics of the graph 
+rule calculate_graph_statistics:
+        input:"graph/{prog}/graph_{prog}_combined.gfa"
+        output:"graph/{prog}/graph_{prog}_stat.tsv"
+        threads:10
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        params:
+            grtype="{prog}"
+        shell:
+           """
+            
+            ./graph_stat.py  -g {input}  -o {output} -r {{1..29}}_UCD -t {params.grtype} 
+
+           """
 
 #indexing require for giraffe mapping 
 

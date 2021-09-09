@@ -178,7 +178,7 @@ rule cactus_combine:
 
 rule cactus_convert_gfa:
         input:"graph/cactus/cactus_combined.vg"
-        output:"graph/cactus/cactus_combined.gfa"
+        output:"graph/cactus/graph_cactus_combined.gfa"
         threads:10
         resources:
            mem_mb= 5000,
