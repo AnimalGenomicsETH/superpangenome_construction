@@ -163,7 +163,7 @@ rule cactus_drop_paths:
 
 rule cactus_combine:
         input:expand("graph/cactus/{chromo}/cactus_drop_{chromo}.vg",chromo=chromo_list)
-        output:"graph/cactus/cactus_combined.vg"
+        output:"graph/cactus/graph_cactus_combined.vg"
         threads:10
         resources:
            mem_mb= 5000,
@@ -177,7 +177,7 @@ rule cactus_combine:
            """
 
 rule cactus_convert_gfa:
-        input:"graph/cactus/cactus_combined.vg"
+        input:"graph/cactus/graph_cactus_combined.vg"
         output:"graph/cactus/graph_cactus_combined.gfa"
         threads:10
         resources:
@@ -211,8 +211,8 @@ rule cactus_graphmap_join:
            """
 
 rule chop_cactus:
-        input:"graph/cactus/cactus_combined.vg"
-        output:"graph/cactus/cactus_combined_chop.vg"
+        input:"graph/cactus/graph_cactus_combined.vg"
+        output:"graph/cactus/graph_cactus_chop.vg"
         threads:10
         resources:
            mem_mb= 5000,
@@ -225,7 +225,7 @@ rule chop_cactus:
            """
 
 rule convert_cactus_chop_gfa:
-        input:"graph/cactus/cactus_combined_chop.vg"
+        input:"graph/cactus/graph_cactus_chop.vg"
         output:"graph/cactus/graph_cactus_chop.gfa"
         threads:10
         resources:
@@ -234,4 +234,5 @@ rule convert_cactus_chop_gfa:
         shell:
            """
             vg convert -f {input} > {output}
+            
            """

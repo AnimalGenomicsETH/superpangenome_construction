@@ -4,7 +4,7 @@ assemb_list, = glob_wildcards(assemb_dir + "/assembly/{breed}_aut.fa")
 # print(assemb_list)
 ref_genome = "UCD"
 chromo_list = list(range(1, 30))
-impgr_list=['hg','pg','og','vg','gfa','xg']
+# impgr_list=['hg','pg','og','vg','gfa','xg']
 index_list=['xg','giraffe.gbwt','gg','min','snarl','dist']
 
 
@@ -233,10 +233,10 @@ rule convert_ppgb:
     input: "graph/pggb_{chromo}/pggb_{chromo}.gfa"
     output: 
         vg="graph/pggb_{chromo}/pggb_{chromo}.vg",
-        xg="graph/pggb_{chromo}/pggb_{chromo}.xg",
-        pg="graph/pggb_{chromo}/pggb_{chromo}.pg",
-        hg="graph/pggb_{chromo}/pggb_{chromo}.hg",
-        og="graph/pggb_{chromo}/pggb_{chromo}.og",
+        # xg="graph/pggb_{chromo}/pggb_{chromo}.xg",
+        # pg="graph/pggb_{chromo}/pggb_{chromo}.pg",
+        # hg="graph/pggb_{chromo}/pggb_{chromo}.hg",
+        # og="graph/pggb_{chromo}/pggb_{chromo}.og",
     threads: 10
     resources:
         mem_mb= 2000,
@@ -246,20 +246,51 @@ rule convert_ppgb:
         """
         vg convert --threads {threads} -g {input} -v > {output.vg}
 
-        vg convert --threads {threads} -g {input} -x > {output.xg}
+        # vg convert --threads {threads} -g {input} -x > {output.xg}
 
-        vg convert --threads {threads} -g {input} -p > {output.pg}
+        # vg convert --threads {threads} -g {input} -p > {output.pg}
 
-        vg convert --threads {threads} -g {input} -a > {output.hg}
+        # vg convert --threads {threads} -g {input} -a > {output.hg}
 
-        vg convert --threads {threads} -g {input} -o > {output.og}
+        # vg convert --threads {threads} -g {input} -o > {output.og}
 
         """
 
+
+# rule combine_pggb:
+#     input:  expand("graph/pggb_{chromo}/pggb_{chromo}.{{impgr}}",chromo=chromo_list,impgr=impgr_list)
+#     output: 
+#         full_graph="graph/pggb/graph_pggb_test.{impgr}"
+#     threads: 10
+#     resources:
+#         mem_mb = 5000,
+#         walltime = "04:00"
+#     shell:
+#         """
+        
+#         vg combine {input} > {output.full_graph}
+       
+#         """
+
+
+# rule convert_pggb_gfa:
+#         input: "graph/pggb/graph_pggb_test.gfa",
+#         output: "graph/pggb/graph_pggb_combined.gfa"
+#         threads: 1
+#         resources:
+#            mem_mb=1000 ,
+#            walltime= "01:00"
+#         shell:
+#            """
+#             ln -s {input} > {output}
+#            """
+
+
+
 rule combine_pggb:
-    input:  expand("graph/pggb_{chromo}/pggb_{chromo}.{{impgr}}",chromo=chromo_list,impgr=impgr_list)
+    input:  expand("graph/pggb_{chromo}/pggb_{chromo}.vg",chromo=chromo_list)
     output: 
-        full_graph="graph/pggb/graph_pggb_test.{impgr}"
+        full_graph="graph/pggb/graph_pggb_combined.vg"
     threads: 10
     resources:
         mem_mb = 5000,
@@ -273,21 +304,24 @@ rule combine_pggb:
 
 
 rule convert_pggb_gfa:
-        input: "graph/pggb/graph_pggb_test.gfa",
+        input: "graph/pggb/graph_pggb_combined.vg",
         output: "graph/pggb/graph_pggb_combined.gfa"
-        threads: 1
+        threads: 10
         resources:
-           mem_mb=1000 ,
+           mem_mb=2000 ,
            walltime= "01:00"
         shell:
            """
-            ln -s {input} > {output}
+
+            vg convert -t {threads} -f {input} > {output} 
+
            """
 
 rule chop_pggb:
-    input:  "graph/pggb/graph_pggb_test.{impgr}"
+    input:  "graph/pggb/graph_pggb_combined.vg"
     output: 
-        chop_graph="graph/pggb/graph_pggb_chop_test.{impgr}"
+        chop_graph="graph/pggb/graph_pggb_chop.vg",
+        gfa="graph/pggb/graph_pggb_chop.gfa"
     threads: 10
     resources:
         mem_mb = 5000,
@@ -296,6 +330,8 @@ rule chop_pggb:
         """
         
         vg mod -t {threads} -X 1000 {input} > {output.chop_graph}
+
+        vg convert -t {threads} -f {input} > {output.gfa} 
        
         """
 
