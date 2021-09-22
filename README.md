@@ -1,6 +1,7 @@
 # Compare pangenome graph construction 
 
-This project attempts to compare multiple pangenome graph construction. 
+This project attempts to compare multiple pangenome graph construction.     
+
 Consists of two experiment (in the respective folder):
 
 - Simulated 
