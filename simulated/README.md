@@ -16,7 +16,7 @@ In `map_call.smk` short-read data simulated with `Mason` are mapped to cactus, p
 
 In `map_lr.smk` long-read data simulated with `pbsim2` of both Pacbio and ONT using model based on P6C4.model and R95 chemistry respectively. Simulated reads mapped to three graphs with `GraphAligner` and variations were called with `vg call`. To compare with linear mapping, the pipeline mapped simulated reads to the reference backbone with  `ngmlr` and call SV with `sniffles`. 
 
-### Tested graphs (ass 9 July):
+### Tested graphs (as 9 July):
 - Minigraph (version 0.15-r426)
 - PGGB (snapshot docker of `docker pull ghcr.io/pangenome/pggb:20210706131009d4e06f`) 
 - Cactus version 2.0.1

@@ -9,6 +9,7 @@ import pysam
 import re
 
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input",

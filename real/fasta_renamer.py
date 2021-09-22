@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-from os import lseek
+from 
 
 def parse_args():
         parser = argparse.ArgumentParser(description = __doc__,
