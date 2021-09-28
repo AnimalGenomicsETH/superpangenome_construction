@@ -189,10 +189,30 @@ if __name__ == "__main__":
 
     input_file.close()
 
-    # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
-    print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
-    print(graph, grtype, "edges", *edge_calc(edge_cum, node_cum), file=outfile)
-    print(graph, grtype, "small_nodes", *small_node_calc(node_cum), file=outfile)
-    print(graph, grtype, "core-flexible_analysis", *core_flexible_calc(node_count,len(all_breed),node_cum), file=outfile)
-    outfile.close()
 
+    # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
+    # print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
+    # print(graph, grtype, "edges", *edge_calc(edge_cum, node_cum), file=outfile)
+    # print(graph, grtype, "small_nodes", *small_node_calc(node_cum), file=outfile)
+    # print(graph, grtype, "core-flexible_analysis", *core_flexible_calc(node_count, len(all_breed), node_cum), file=outfile)
+
+    # make the output become more informative
+    node_info = ["total_nodes", "len_nodes", "ref_nodes", "ref_nodes_len", "non_ref_nodes", "non_ref_nodes_len"]
+    edge_info = ["total_edges", "Ref-Ref edges", "Ref-Nonref edges", "Nonref-Nonref edges"]
+    flexible_info = ["core_nodes", "private_nodes", "flexible_nodes",
+                     "all_nodes", "core_len", "private_len", "flexible_len", "all_len"]
+    node_info_small = [x + "_small" for x in node_info]
+
+    for nodeinf, nodestat in zip(node_info, node_calc(node_cum)):
+        print(nodeinf, nodestat, file=outfile)
+
+    for edgeinf, edgestat in zip(edge_info, edge_calc(node_cum)):
+        print(edgeinf, edgestat, file=outfile)
+
+    for flexcomp, flexstat in zip(flexible_info, core_flexible_calc(node_count, len(all_breed), node_cum)):
+        print(flexcomp, flexstat, file=outfile)
+
+    for node_info_small, nodestat in zip(node_info, small_node_calc(node_cum)):
+        print(nodeinf, nodestat, file=outfile)
+
+    outfile.close()
