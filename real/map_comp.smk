@@ -554,3 +554,70 @@ rule graph_mapping_statistics:
            
            """   
 
+
+### conventional vg mapping 
+
+rule prune_vg_graph:
+        input:"graph/{prog}/graph_{prog}_chop.vg"
+        output:"graph/{prog}/graph_{prog}_pruned.vg"
+        threads:10
+        resources:
+           mem_mb=5000 ,
+           walltime= "04:00"
+        shell:
+           """
+            
+            vg prune -t {threads} -M 32 --restore-paths {input} > {output} 
+
+           """
+
+rule index_vg_gcsa:
+        input:"graph/{prog}/graph_{prog}_pruned.vg"
+        output:"graph/{prog}/graph_{prog}.gcsa"
+        threads:10
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        params:
+           scrdir="graph/{prog}/graph_{prog}_pruned.vg"
+        shell:
+           """
+
+           vg index --temp-dir {params.tmp_dir} -p -t {threads} -g {output.gcsa} {input} 
+
+           """
+
+rule vg_map_conventional:
+        input:
+            gcsa="graph/{prog}/graph_{prog}.gcsa",
+            xg="graph/{prog}/graph_{prog}.xg",
+            gbwt="graph/{prog}/graph_{prog}.giraffe.gbwt",
+            r1=fastq_dir + "/{anim}_R1.fastq.gz",
+            r2=fastq_dir + "/{anim}_R2.fastq.gz"
+        output:"mapped/{prog}_{anim}_conv.gam"
+        threads:32
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        shell:
+           """
+            
+            vg map -t {threads} \
+            -x {input.xg} -g {input.gcsa} -1 {index.gbwt} \
+            -f {input.r1} -f {input.r2} > {output}
+
+           """
+
+rule graph_mapping_statistics_conv:
+        input:"mapped/{prog}_{anim}_conv.gam"
+        output:"mapped/{prog}_{anim}_mapping_stat_conv.tsv"
+        threads:10
+        resources:
+           mem_mb= 2000,
+           walltime= "04:00"
+        shell:
+           """
+        
+            vg stats -a {input} > {output}
+           
+           """   
