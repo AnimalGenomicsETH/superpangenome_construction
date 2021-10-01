@@ -161,8 +161,9 @@ if __name__ == "__main__":
             # rtype 0 as nonref
             node_cum[node_id] = node_stats(id=node_id, nodelen=node_len, rtype=0)
             # in minigraph we use the rank to determine ref path
-            if grtype == "minigraph":
-                node_cum[node_id].rtype = 1 if int(line_comp[-1].split(":")[-1]) == 0 else 0
+            # the minigraph has been converted as compatible pggb graph
+            #if grtype == "minigraph":
+               # node_cum[node_id].rtype = 1 if int(line_comp[-1].split(":")[-1]) == 0 else 0
         elif line.startswith("L"):
             parent_node = line_comp[1]
             child_node = line_comp[3]
@@ -206,13 +207,14 @@ if __name__ == "__main__":
     for nodeinf, nodestat in zip(node_info, node_calc(node_cum)):
         print(nodeinf, nodestat, file=outfile)
 
-    for edgeinf, edgestat in zip(edge_info, edge_calc(node_cum)):
+    for edgeinf, edgestat in zip(edge_info, edge_calc(edge_cum,node_cum)):
         print(edgeinf, edgestat, file=outfile)
+    
+    # work for core-flexible for minigraph
+    #for flexcomp, flexstat in zip(flexible_info, core_flexible_calc(node_count, len(all_breed), node_cum)):
+        #print(flexcomp, flexstat, file=outfile)
 
-    for flexcomp, flexstat in zip(flexible_info, core_flexible_calc(node_count, len(all_breed), node_cum)):
-        print(flexcomp, flexstat, file=outfile)
-
-    for node_info_small, nodestat in zip(node_info, small_node_calc(node_cum)):
-        print(nodeinf, nodestat, file=outfile)
+    for node_info_small, nodestat in zip(node_info_small, small_node_calc(node_cum)):
+        print(node_info_small, nodestat, file=outfile)
 
     outfile.close()
