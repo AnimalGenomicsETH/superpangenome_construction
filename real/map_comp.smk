@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+import os 
+
 assemb_dir = "/cluster/work/pausch/danang/psd/scratch/real_data"
-assemb_list, = glob_wildcards(assemb_dir + "/assembly/{breed}_aut.fa")
+#assemb_list, = glob_wildcards(assemb_dir + "/assembly/{breed}_aut.fa")
+assemb_list = ["UCD","Angus","Highland","OBV"]
 # print(assemb_list)
 ref_genome = "UCD"
 chromo_list = list(range(1, 30))
@@ -25,7 +28,7 @@ fastq_dir="/cluster/work/pausch/inputs/fastq/BTA"
 
 
 #toggle for optional analysis, change 0 to 1 to run respective analysis
-run_mapping=1
+run_mapping=0
 run_cactus=1
 
 def optional_output(run_mapping,run_cactus):
@@ -35,10 +38,10 @@ def optional_output(run_mapping,run_cactus):
         opt_out.extend(expand("mapped/{prog}_{anim}_mapping_stat_up.tsv",prog=prog_list,anim=anim_list)),
         opt_out.extend(expand("mapped/{prog}_{anim}_up.gam",prog=prog_list,anim=anim_list))
     if run_cactus:
-        opt_out.append("graph/cactus/cactus_combined.vg"),
-        opt_out.append("graph/cactus/cactus_combined.gfa"),
-        opt_out.append("graph/cactus/cactus_combined_chop.vg"),
-        opt_out.append("graph/cactus/graph_cactus_chop.gfa"),
+        opt_out.append("graph/cactus/graph_cactus_combined.vg"),
+        opt_out.append("graph/cactus/graph_cactus_combined.gfa"),
+        #opt_out.append("graph/cactus/cactus_combined_chop.vg"),
+        #opt_out.append("graph/cactus/graph_cactus_chop.gfa"),
         #opt_out.append("combine_finished.tsv")
     return opt_out
 
@@ -49,7 +52,7 @@ rule all:
            #expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
         #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
-           expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
+           #expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
            optional_output(run_mapping,run_cactus),
            expand("graph/{prog}/graph_{prog}_stat.tsv",prog=prog_list),
            
@@ -135,6 +138,7 @@ rule determine_order:
 
 
 def get_order_list(order_file, chromo):
+    if not os.path.exists(order_file): return ""
     infile = open(order_file)
     return [f"assembly/{chromo}/{br}_{chromo}.fa" for br in infile.readlines()[0].strip().split(" ")]
     infile.close()
