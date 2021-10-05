@@ -11,7 +11,8 @@ rule create_seq_file:
             fasta=expand("assembly/{{chromo}}/{anim}_{{chromo}}.fa",anim=assemb_list)
         output:
             seqfile="graph/cactus/{chromo}/seqfile_{chromo}.txt",
-            seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_masked.txt"
+            seqfile_brnn="graph/cactus/{chromo}/seqfile_{chromo}_brnn.txt",
+            seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_secmask.txt"
         params:
             prefix="graph/cactus/{chromo}",
             anims=assemb_list,
@@ -22,7 +23,8 @@ rule create_seq_file:
            for anim in {params.anims}
            do
                 echo {params.chromo}_${{anim}} assembly/{params.chromo}/${{anim}}_{params.chromo}.fa >> {params.prefix}/seqfile_{params.chromo}.txt
-                echo {params.chromo}_${{anim}} {params.prefix}/${{anim}}_{params.chromo}_masked.fa >> {params.prefix}/seqfile_{params.chromo}_masked.txt
+                echo {params.chromo}_${{anim}} {params.prefix}/${{anim}}_{params.chromo}_brnn.fa >> {params.prefix}/seqfile_{params.chromo}_brnn.txt
+                echo {params.chromo}_${{anim}} {params.prefix}/${{anim}}_{params.chromo}_secmask.fa >> {params.prefix}/seqfile_{params.chromo}_secmask.txt
            done 
 
            """
@@ -65,7 +67,7 @@ rule cactus_preprocess_brnn:
 rule cactus_preprocess_graphmap:
         input: 
             graph="graph/minigraph/graph_{chromo}.gfa",
-            fasta=expand("assembly/{{chromo}}/{anim}_{{chromo}}_brnn.fa",anim=assemb_list),
+            fasta=expand("graph/cactus/{{chromo}}/{anim}_{{chromo}}_brnn.fa",anim=assemb_list),
             seqfile="graph/cactus/{chromo}/seqfile_{chromo}_brnn.txt",
         output: 
             paf="graph/cactus/{chromo}/cactus_{chromo}.paf"
@@ -89,7 +91,7 @@ rule cactus_preprocess_graphmap:
             cactus-graphmap $PWD/{params.chromo}_src  \
             {input.seqfile} \
             {input.graph} {output.paf} \
-            --outputFasta {params.prefix}/cactus_{wildcards.chromo}.fa \
+            --outputFasta {params.prefix}/cactus_{wildcards.chromo}_sec.fa \
             --realTimeLogging
 
            """
@@ -129,8 +131,9 @@ rule cactus_preprocess_second_masked:
 #Step 3: Real cactus alignment
 rule cactus_align:
         input:
-              seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_secmask.txt",
-              paf="graph/cactus/{chromo}/cactus_{chromo}.paf"
+              seqfile_masked="graph/cactus/{chromo}/seqfile_{chromo}_brnn.txt",
+              paf="graph/cactus/{chromo}/cactus_{chromo}.paf",
+              fasta=expand("graph/cactus/{{chromo}}/{anim}_{{chromo}}_secmask.fa",anim=assemb_list)
         output:
               gfa="graph/cactus/{chromo}/cactus_{chromo}.gfa.gz",
               hal="graph/cactus/{chromo}/cactus_{chromo}.hal",
