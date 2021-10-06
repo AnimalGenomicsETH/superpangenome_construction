@@ -8,44 +8,6 @@ cat << EOF
         -p prefix
 	-c chr:pos1[-pos2]
 	-e expand context by x node
-##################################################
-EOF
-
-exit 1
-
-}
-
-if [[ $# -eq 0 ]];then usage; fi
-
-while getopts ":p:c:e:" opt;do
-        case $opt in
-                p) prefix=$OPTARG ;;
-		c) chromo=$OPTARG ;;
-		e) context=$OPTARG ;;
-                \?|:|h) usage;;
-        esac
-done
-
-shift $((OPTIND - 1))
-
-
-context=${context:-0}
-echo $context
-
-#subset the graph 
-for grtype in pggb cactus minigraph 
-do 
-  infile="graph/${grtype}/graph_${grtype}_combined.gfa"
-  r/bin/env bash
-
-usage (){
-
-cat << EOF
-##################################################
-        visualize the 
-        -p prefix
-	-c chr:pos1[-pos2]
-	-e expand context by x node
         # Note that this required vg v1.34, Bandage, and montage for combining
         # can be activated with `conda activate imageman` 
 ##################################################
@@ -91,10 +53,3 @@ montage -geometry 900x -tile 3x1 \
    ${prefix}_cactus.png \
    ${prefix}_minigraph.png \
    ${prefix}_comb.png 
-
-
-
-
-
-
-
