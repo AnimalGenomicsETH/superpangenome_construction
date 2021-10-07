@@ -108,11 +108,13 @@ rule split_chromosome:
     shell:
         """
 
-        if [[ "{wildcards.assemb}" == "{params.ref}" ]]; then 
-            samtools faidx {input} {wildcards.chromo} > {output}
-        else
-            samtools faidx {input} {wildcards.chromo}_{wildcards.assemb} > {output}
-        fi 
+        #if [[ "{wildcards.assemb}" == "{params.ref}" ]]; then 
+        #    samtools faidx {input} {wildcards.chromo} > {output}
+        #else
+        #    samtools faidx {input} {wildcards.chromo}_{wildcards.assemb} > {output}
+        #fi 
+            
+        samtools faidx {input} {wildcards.chromo}_{wildcards.assemb} > {output}
 
         """
 
