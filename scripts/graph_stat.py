@@ -133,7 +133,8 @@ if __name__ == "__main__":
         for comp in args.ref:
             # this is little hack
             # TODO: formalize ref name
-            ref_cac = str(comp) + "_UCD." + str(comp)
+            #ref_cac = str(comp) + "_UCD." + str(comp)
+            ref_cac = str(comp) + "." +  str(comp)
             print(ref_cac)
             ref.append(ref_cac)
 
