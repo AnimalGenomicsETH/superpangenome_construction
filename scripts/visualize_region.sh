@@ -33,13 +33,19 @@ shift $((OPTIND - 1))
 
 context=${context:-0}
 echo $context
-
+contig=$(cut -f1 -d":" <<< $chromo)
+pos=$(cut -f2 -d":" <<< $chromo)
  
 for grtype in pggb cactus minigraph 
 do 
   infile="graph/${grtype}/graph_${grtype}_combined.gfa"
   # subset the graph
-  vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+  if [[ $grtype == "cactus" ]];then 
+ 	 vg find -p ${contig}.${contig}:${pos} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+  else
+
+ 	 vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+  fi
   # make fasta of the gfa
   awk '$1 ~ /S/{print ">"$2"\n"$3}' ${prefix}_${grtype}.gfa > ${prefix}_${grtype}.fa
   # visualize it 
