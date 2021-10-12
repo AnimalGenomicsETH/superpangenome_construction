@@ -1,4 +1,4 @@
-#usr/bin/env bash
+#ususr/bin/env bash
 
 usage (){
 
@@ -41,15 +41,17 @@ do
   infile="graph/${grtype}/graph_${grtype}_combined.gfa"
   # subset the graph
   if [[ $grtype == "cactus" ]];then 
- 	 vg find -p ${contig}.${contig}:${pos} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+	  vg find -p ${contig}.${contig}:${pos} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
   else
 
- 	 vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+	  vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
   fi
   # make fasta of the gfa
   awk '$1 ~ /S/{print ">"$2"\n"$3}' ${prefix}_${grtype}.gfa > ${prefix}_${grtype}.fa
   # visualize it 
-  Bandage image ${prefix}_${grtype}.gfa ${prefix}_${grtype}.png
+  Bandage image ${prefix}_${grtype}.gfa ${prefix}_${grtype}.png --names --fontsize 6
+  # node label information
+  ./node_labels.py -i ${prefix}_${grtype}.gfa -o ${prefix}_${grtype}_label.tsv
 done
 
 
