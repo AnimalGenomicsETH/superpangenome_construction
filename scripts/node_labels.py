@@ -40,9 +40,10 @@ if __name__ == "__main__":
                     node_comb[comp].label.append(label_id)
 
     with open(output,"w") as outfile:
-        outfile.write("node_id\tnode_len\tnode_label\n")
+        outfile.write("node_id\tnode_len\tnode_label\tshort_label\n")
         for key,value in node_comb.items():
-            print(value.name,value.length,",".join(sorted(value.label)),sep="\t",file=outfile)
+            short_label="".join(x[0] for x in sorted(value.label)) 
+            print(value.name,value.length,",".join(sorted(value.label)),short_label,sep="\t",file=outfile)
 
 
 

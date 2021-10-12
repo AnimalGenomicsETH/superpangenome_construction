@@ -15,8 +15,9 @@ p is the prefix of output files
 c is the chromosomal region to visualize     
 e indicates how many nodes extended from the regions for visualization    
 
-*Note*  The batch submission should include `-R XF` for X11 forwarding, required by Bandage
-It will output:     
+*Note*  The batch submission should include `-R XF` for X11 forwarding, required by Bandage      
+
+Output:     
 -subset graph (in gfa)       
 -visualize graph from three program side by side (in comb file)          
 -label of each nodes in `*labels.tsv`    
