@@ -10,12 +10,14 @@ def parse_args():
                     formatter_class = argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-i","--input",help="input graph file")
     parser.add_argument("-o","--output",help="output node label file")
+    parser.add_argument("-r","--ref",help="reference sample",default="UCD")
     return parser.parse_args()
 
 if __name__ == "__main__":
     args=parse_args()
     input=args.input
     output=args.output
+    reference=args.ref
     
     @dataclass
     class node_info:
@@ -37,16 +39,13 @@ if __name__ == "__main__":
                 label_node = token[2].split(",")
                 for comp in label_node:
                     comp = comp[:-1]
-                    node_comb[comp].label.append(label_id)
+                    if label_id not in node_comb[comp].label:
+                        node_comb[comp].label.append(label_id)
 
     with open(output,"w") as outfile:
-        outfile.write("node_id\tnode_len\tnode_label\tshort_label\n")
+        outfile.write("node_id\tnode_len\tnode_label\tshort_label\tRef_status\n")
         for key,value in node_comb.items():
+            ref_status = "R" if reference in value.label else "NR"
             short_label="".join(x[0] for x in sorted(value.label)) 
-            print(value.name,value.length,",".join(sorted(value.label)),short_label,sep="\t",file=outfile)
+            print(value.name,value.length,",".join(sorted(value.label)),short_label,ref_status,sep="\t",file=outfile)
 
-
-
-    
-
-    
