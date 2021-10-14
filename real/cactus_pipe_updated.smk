@@ -162,7 +162,9 @@ rule cactus_align:
 
 rule cactus_drop_paths:
         input:"graph/cactus/{chromo}/cactus_{chromo}.vg"
-        output:"graph/cactus/{chromo}/cactus_drop_{chromo}.vg"
+        output: 
+            vg="graph/cactus/{chromo}/cactus_drop_{chromo}.vg",
+            gfa="graph/cactus/{chromo}/cactus_drop_{chromo}.gfa"
         threads:10
         resources:
            mem_mb=2000 ,
@@ -171,7 +173,9 @@ rule cactus_drop_paths:
         shell:
            """
             
-          vg paths -Q _MINIGRAPH -d -v {input} > {output}
+          vg paths -Q _MINIGRAPH -d -v {input} > {output.vg}
+
+          vg convert --threads {threads} -f {output.vg} > {output.gfa}
 
            """
 

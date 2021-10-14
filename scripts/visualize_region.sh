@@ -34,6 +34,7 @@ shift $((OPTIND - 1))
 context=${context:-0}
 echo $context
 contig=$(cut -f1 -d":" <<< $chromo)
+chrom_id=$(cut -f1 -d"_" <<< $contig)
 pos=$(cut -f2 -d":" <<< $chromo)
  
 for grtype in pggb cactus minigraph 
@@ -41,9 +42,13 @@ do
   infile="graph/${grtype}/graph_${grtype}_combined.gfa"
   # subset the graph
   if [[ $grtype == "cactus" ]];then 
+	  infile="graph/cactus/${chrom_id}/cactus_drop_${chrom_id}.gfa"
 	  vg find -p ${contig}.${contig}:${pos} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
-  else
-
+  elif [[ $grtype == "pggb" ]];then 
+	  infile="graph/pggb_${chrom_id}/pggb_${chrom_id}.gfa"
+	  vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
+  elif [[ $grtype == "minigraph" ]];then 
+	  infile="graph/minigraph/graph_${chrom_id}.gfa"
 	  vg find -p ${chromo} -c ${context} -x ${infile} > ${prefix}_${grtype}.gfa
   fi
   # make fasta of the gfa
