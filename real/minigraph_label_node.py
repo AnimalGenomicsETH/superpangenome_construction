@@ -82,6 +82,23 @@ rule combine_coverage:
 
         combcov['color'] = covsimp.apply(color_based_coverage,breed_list=breed_list,axis='columns')
 
+        def get_short_label(row):
+            if row.color:
+                color_list=row['color'].split(",")
+                return "".join([x[0] for x in color_list])
+            return 'NP'
+
+        combcov['short_label'] = combcov.apply(get_short_label,axis='columns')
+
+        def get_ref_status(row,ref_genome):
+            color_list=row['color'].split(",")
+            if ref_genome in color_list:
+                return "R"
+            else:
+                return "NR"
+        
+        combcov['ref_status'] = combcov.apply(get_ref_status,ref_genome=ref_genome,axis='columns')
+
         with open(output[0],"w") as outfile:
             combcov.to_csv(outfile,sep='\t',index=False)
 
