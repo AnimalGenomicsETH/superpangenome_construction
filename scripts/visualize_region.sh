@@ -1,4 +1,4 @@
-#usr/bin/env bash
+#!/usr/bin/env bash
 
 usage (){
 
@@ -56,7 +56,20 @@ do
   # visualize it 
   Bandage image ${prefix}_${grtype}.gfa ${prefix}_${grtype}.png --names --fontsize 6
   # node label information
-  ./node_labels.py -i ${prefix}_${grtype}.gfa -o ${prefix}_${grtype}_label.tsv
+   if [[ $grtype == "minigraph" ]];then
+
+          awk 'NR==FNR && $1 ~ />/{var=substr($0,2,length($0));arr["s"var];next}$1 in arr{print $0}' \
+          ${prefix}_${grtype}.fa graph/minigraph/${chrom_id}/${chrom_id}_comb_coverage.tsv > ${prefix}_${grtype}.tmp
+
+          cat <( echo node_id node_len node_label short_label ref_status ) \
+          <( awk '{print $1,$2,$(NF-2),$(NF-1),$NF}' OFS="\t" ${prefix}_${grtype}.tmp) > ${prefix}_${grtype}_label.tsv
+
+          if [[ -f ${prefix}_${grtype}.tmp ]];then rm ${prefix}_${grtype}.tmp; fi
+
+  else
+        ./node_labels.py -i ${prefix}_${grtype}.gfa -o ${prefix}_${grtype}_label.tsv
+  fi
+  #./node_labels.py -i ${prefix}_${grtype}.gfa -o ${prefix}_${grtype}_label.tsv
 done
 
 
