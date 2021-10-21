@@ -91,7 +91,7 @@ if __name__ == "__main__":
     prev_chromo=""
     svid=""
 
-    with open(args.input) as infile:
+    with open(args.input) as infile, open(args.output,"w") as outfile:
         for index,line in enumerate(infile):
             line_comp = line.strip().split("\t")
             chromo,start_pos,stop_pos,svid,ensmbl,chromo2,svtype,*_,svcomp=line_comp
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 prev_start = start_pos
                 prev_chromo = chromo
             else:
-                print(previd,prev_chromo,prev_start,prevfeat,prev_gene_id,prev_gene_name)
+                print(previd,prev_chromo,prev_start,prevfeat,prev_gene_id,prev_gene_name, file=outfile)
                 prevfeat = "intergenic" if svtype =="." else svtype
                 previd = svid
                 prev_start = start_pos
