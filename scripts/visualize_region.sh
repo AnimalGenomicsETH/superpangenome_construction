@@ -61,7 +61,7 @@ do
           awk 'NR==FNR && $1 ~ />/{var=substr($0,2,length($0));arr["s"var];next}$1 in arr{print $0}' \
           ${prefix}_${grtype}.fa graph/minigraph/${chrom_id}/${chrom_id}_comb_coverage.tsv > ${prefix}_${grtype}.tmp
 
-          cat <( echo node_id node_len node_label short_label ref_status ) \
+          cat <( echo -e "node_id\tnode_len\tnode_label\tshort_label\tref_status" ) \
           <( awk '{print $1,$2,$(NF-2),$(NF-1),$NF}' OFS="\t" ${prefix}_${grtype}.tmp) > ${prefix}_${grtype}_label.tsv
 
           if [[ -f ${prefix}_${grtype}.tmp ]];then rm ${prefix}_${grtype}.tmp; fi
