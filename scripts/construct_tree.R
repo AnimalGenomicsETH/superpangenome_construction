@@ -12,6 +12,11 @@ disfile=args[1]
 fastadir=args[2]
 outfile=args[3]
 
+fasta_suffix=ifelse( length(args)>3, args[4], "fa")
+
+
+suffix_fasta=args[4]
+
 #loading library 
 library("tidyverse")
 library("ape")
@@ -46,7 +51,7 @@ write.tree(tr,file=outfile)
 uniq_anim <- unique(datdis$anim1c)
 
 for (anim in uniq_anim){
-	cat(anim,paste0(fastadir,"/",anim,".fa"),"\n",file=outfile,append=TRUE)
+	cat(anim,paste0(fastadir,"/",anim,".",suffix_fasta),"\n",file=outfile,append=TRUE)
 }
 
 
