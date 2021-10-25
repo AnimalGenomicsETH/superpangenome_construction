@@ -3,10 +3,12 @@
 dirwork="/cluster/work/pausch/danang/psd/scratch/real_yak2"
 #chromo_list = list(range(25, 26))
 chromo_list = [25]
-#assemb_list = ["UCD","Angus","Highland","OBV","Brahman","Yak","BSW","Pied","Gaur","Nellore"]
-assemb_list = ["UCD","Angus"]
+assemb_list = ["UCD","Angus","Highland","OBV","Brahman","Yak","BSW","Pied","Gaur","Nellore"]
+#assemb_list = ["UCD","Angus"]
 ref_genome = "UCD"
 rep_library="BosTau9_repeat_library.fasta"
+#temporary files for cactus
+jobstore="/cluster/scratch/cdanang/cactus_dump"
 
 rule all:
     input:
@@ -89,12 +91,28 @@ rule cactus_create_seqfile:
     shell:
         """
 
-        ./construct_tree.R {input.distance_file} {params.fasta_dir} {output} fa.masked
+        ./construct_tree.R {input.distance_file} {params.fasta_dir} {output} fa.masked {wildcards.chromo}
 
         """
 
 
-# rule cactus_align:
+rule cactus_align:
+    input:"graph/cactus/cactus_{chromo}_seqfile.tsv"
+    output:"graph/cactus/cactus_{chromo}.hal"
+    threads: 20
+    resources:
+        mem_mb=5000
+        walltime="24:00"
+    params:
+        jobstore=jobstore
+    shell:
+        """
+
+        cactus --maxLocalJobs {threads} \
+        {params.jobstore}  \
+        {input} {output}
+
+        """
 
 
 # rule cactus_combine_graph:

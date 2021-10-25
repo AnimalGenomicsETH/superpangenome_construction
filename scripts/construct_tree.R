@@ -13,9 +13,7 @@ fastadir=args[2]
 outfile=args[3]
 
 fasta_suffix=ifelse( length(args)>3, args[4], "fa")
-
-
-suffix_fasta=args[4]
+chromo=ifelse( length(args)>4, paste0("_",args[5]), "")
 
 #loading library 
 library("tidyverse")
@@ -27,6 +25,7 @@ datdis  <- read.table(disfile,header=FALSE, stringsAsFactors =FALSE)
 #rename the header
 colnames(datdis)  <- c("anim1","anim2","distr","comp4","comp5")
 
+#assembly/25/25_rep/UCD_25.fa.masked
 
 # give correct assembly name
 
@@ -51,7 +50,7 @@ write.tree(tr,file=outfile)
 uniq_anim <- unique(datdis$anim1c)
 
 for (anim in uniq_anim){
-	cat(anim,paste0(fastadir,"/",anim,".",suffix_fasta),"\n",file=outfile,append=TRUE)
+	cat(anim,paste0(fastadir,"/",anim,chromo,".",fasta_suffix),"\n",file=outfile,append=TRUE)
 }
 
 
