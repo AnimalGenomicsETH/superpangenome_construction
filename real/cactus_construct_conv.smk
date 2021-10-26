@@ -13,7 +13,10 @@ jobstore="/cluster/scratch/cdanang/cactus_dump"
 rule all:
     input:
         expand("assembly/{chromo}/{chromo}_rep/{breed}_{chromo}.fa.masked",chromo=chromo_list,breed=assemb_list),
-        expand("graph/cactus/cactus_{chromo}_seqfile.tsv",chromo=chromo_list)
+        expand("graph/cactus/cactus_{chromo}_seqfile.tsv",chromo=chromo_list),
+        expand("graph/cactus/cactus_{chromo}.vg",chromo=chromo_list)
+
+        
 
 
     
@@ -101,18 +104,42 @@ rule cactus_align:
     output:"graph/cactus/cactus_{chromo}.hal"
     threads: 20
     resources:
-        mem_mb=5000
+        mem_mb=5000,
         walltime="24:00"
     params:
         jobstore=jobstore
     shell:
         """
 
+        source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+        export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+        export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+
+
         cactus --maxLocalJobs {threads} \
         {params.jobstore}  \
         {input} {output}
 
         """
+
+rule cactus_to_vg:
+    input:"graph/cactus/cactus_{chromo}.hal"
+    output:"graph/cactus/cactus_{chromo}.vg"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    shell:
+        """
+        
+        source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+        export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+        export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+
+        hal2vg --inMemory {input} > {output} 
+
+        """
+
 
 
 # rule cactus_combine_graph:
