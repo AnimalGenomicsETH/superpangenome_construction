@@ -31,9 +31,8 @@ for value in allcomb.values():
         if assemb not in allassemb:
             allassemb.append(assemb)
 
-print(allassemb)
-print(grname)
-
+wildcard_constraints:
+    chromo="\d+"
 
 rule all:
     input:
@@ -42,8 +41,11 @@ rule all:
         #expand("graph/cactus/cactus_{chromo}_{grtype}_seqfile.tsv",grtype=grname,chromo=chromo_list)
         #expand("graph/cactus/cactus_{chromo}_{grtype}_seqfile.tsv",grtype=grname,chromo=chromo_list)
         ##expand("graph/cactus/cactus_{chromo}_{grtype}.hal",grtype=grname,chromo=chromo_list),
-	#expand("graph/minigraph/minigraph_{chromo}_{grtype}.gfa",grtype=grname,chromo=chromo_list),
-	expand("graph/pggb/pggb_{chromo}_{grtype}/pggb_{chromo}_{grtype}.gfa",grtype=grname,chromo=chromo_list)
+	expand("graph/minigraph/minigraph_{chromo}_{grtype}_path.gfa",grtype=grname,chromo=chromo_list),
+        expand("graph/minigraph/minigraph_{chromo}_{grtype}_stat.tsv",grtype=grname,chromo=chromo_list),
+	#expand("graph/pggb/pggb_{chromo}_{grtype}/pggb_{chromo}_{grtype}.gfa",grtype=grname,chromo=chromo_list)
+        expand("graph/pggb/pggb_{chromo}_{grtype}_stat.tsv",grtype=grname,chromo=chromo_list),
+        expand("graph/cactus/cactus_{chromo}_{grtype}_stat.tsv",grtype=grname,chromo=chromo_list)
 
 
     
@@ -152,6 +154,67 @@ rule cactus_align:
 
         """
         
+rule cactus_to_vg:
+    input:"graph/cactus/cactus_{chromo}_{grtype}.hal"
+    output:"graph/cactus/cactus_{chromo}_{grtype}.vg"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    shell:
+        """
+        
+        source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
+        export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
+        export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+
+        hal2vg --inMemory {input} > {output} 
+
+        """
+
+rule cactus_to_gfa:
+    input:"graph/cactus/cactus_{chromo}_{grtype}.vg"
+    output:"graph/cactus/cactus_{chromo}_{grtype}.gfa"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    shell:
+        """
+        vg convert -t {threads} -f {input} > {output}
+
+        """
+
+rule cactus_simplify:
+    input:"graph/cactus/cactus_{chromo}_{grtype}.gfa"
+    output:"graph/cactus/cactus_simple_{chromo}_{grtype}.gfa"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    shell:
+        """
+        
+        awk '$1 !~ /P/{{print;next}} $2 !~ /Anc/{{print}}' {input} > {output}
+
+
+        """
+
+rule cactus_stat:
+    input:"graph/cactus/cactus_simple_{chromo}_{grtype}.gfa"
+    output:"graph/cactus/cactus_{chromo}_{grtype}_stat.tsv"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    params:
+        ref=ref_genome
+    shell:
+        """
+        
+        ./graph_stat_mod.py -g {input} -o {output} -r {params.ref}.{wildcards.chromo}_{params.ref}
+
+        """
 
 
 ### minigraph
@@ -183,10 +246,11 @@ rule determine_order:
 def get_order_list(grtype, chromo):
     print(grtype,chromo)
     order_file=f"tree/order_breed/breed_order_{grtype}.tsv"
+    print(order_file)
     if not os.path.exists(order_file): return ""
     infile = open(order_file)
-    print(f"assembly/{chromo}/{br}_{chromo}.fa" for br in infile.readlines()[0].strip().split(" "))
-    return [f"assembly/{chromo}/{br}_{chromo}.fa" for br in infile.readlines()[0].strip().split(" ")]
+    ak=[f"assembly/{chromo}/{br}_{chromo}.fa" for br in infile.readlines()[0].strip().split(" ")]
+    return ak
     infile.close()
 
 
@@ -199,17 +263,47 @@ rule run_minigraph:
     resources:
         mem_mb = 2000,
         walltime = "04:00"
-    params: order_list = get_order_list("{grtype}", "{chromo}")
+    params:
+        order_list = lambda w: get_order_list(f"{w.grtype}", f"{w.chromo}")
     shell:
         """
-	echo {wildcards.grtype}	
-        echo {params.order_list}
 
+        python --version
+		
         minigraph -t {threads} -xggs {params.order_list} > {output}
 
         """
 
 
+rule modify_minigraph:
+    input:  "graph/minigraph/minigraph_{chromo}_{grtype}.gfa"
+    output: "graph/minigraph/minigraph_{chromo}_{grtype}_path.gfa"
+    threads:10
+    resources:
+        mem_mb=2000 ,
+        walltime= "04:00"
+    shell:
+        """
+        vg convert -r 0 -g {input} -f > {output}
+
+        """
+
+
+rule minigraph_graph_statistics:
+        input:"graph/minigraph/minigraph_{chromo}_{grtype}_path.gfa"
+        output:"graph/minigraph/minigraph_{chromo}_{grtype}_stat.tsv"
+        threads:10
+        resources:
+           mem_mb=2000 ,
+           walltime= "04:00"
+        params:
+            ref=ref_genome
+        shell:
+           """
+
+            ./graph_stat.py  -g {input}  -o {output} -r {wildcards.chromo}_{params.ref} -t minigraph
+
+           """
 #pggb 
 
 rule combine_genome:
@@ -251,112 +345,9 @@ rule construct_pggb:
 
 
 
-
-
-# rule cactus_combine_graph:
-
-
-rule cactus_to_vg:
-    input:"graph/cactus/cactus_{chromo}.hal"
-    output:"graph/cactus/cactus_{chromo}.vg"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    shell:
-        """
-        
-        source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
-        export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
-        export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
-
-        hal2vg --inMemory {input} > {output} 
-
-        """
-
-rule cactus_to_gfa:
-    input:"graph/cactus/cactus_{chromo}.vg"
-    output:"graph/cactus/cactus_{chromo}.gfa"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    shell:
-        """
-        vg convert -t {threads} -f {input} > {output}
-
-        """
-
-rule cactus_simplify:
-    input:"graph/cactus/cactus_{chromo}.gfa"
-    output:"graph/cactus/cactus_simple_{chromo}.gfa"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    shell:
-        """
-        
-        awk '$1 !~ /P/{{print;next}} $2 !~ /Anc/{{print}}' {input} > {output}
-
-
-        """
-
-rule cactus_stat:
-    input:"graph/cactus/cactus_simple_{chromo}.gfa"
-    output:"graph/cactus/cactus_stat_{chromo}.tsv"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    params:
-        ref=ref_genome
-    shell:
-        """
-        
-        ./graph_stat_mod.py -g {input} -o {output} -r {params.ref}.{wildcards.chromo}_{params.ref}
-
-        """
-
-localrules: cactus_combine_stat
-rule cactus_combine_stat:
-    input:expand("graph/cactus/cactus_stat_{chromo}.tsv",chromo=chromo_list),
-    output:"graph/cactus/cactus_combine_stat.tsv"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    run:
-
-        from collections import defaultdict
-        
-        comb_stat=defaultdict(int)
-        list_stat=defaultdict(list)
-
-        outfile=open(output[0],"w")
-        print(input)
-
-        for statfile in input:
-            with open(statfile) as infile:
-                for line in infile:
-                    print(line)
-                    statid, statval = line.strip().split()
-                    statval = int(statval)
-                    comb_stat[statid] += statval
-                    list_stat[statid].append(statval)
-
-        for key,value in list_stat.items():
-            value.append(comb_stat[key])
-            print(key,*value,file=outfile)
-
-        outfile.close()
-
-#stat pggb and minigraph
-# will delete later
-
 rule pggb_stat:
-    input:"graph/pggb_{chromo}/pggb_{chromo}.gfa"
-    output:"graph/pggb/pggb_stat_{chromo}.tsv"
+    input:"graph/pggb/pggb_{chromo}_{grtype}/pggb_{chromo}_{grtype}.gfa"
+    output:"graph/pggb/pggb_{chromo}_{grtype}_stat.tsv"
     threads: 20
     resources:
         mem_mb=2000,
@@ -370,102 +361,3 @@ rule pggb_stat:
 
 
         """
-
-
-localrules: pggb_combine_stat
-rule pggb_combine_stat:
-    input:expand("graph/pggb/pggb_stat_{chromo}.tsv",chromo=chromo_list),
-    output:"graph/pggb/pggb_combine_stat.tsv"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    run:
-
-        from collections import defaultdict
-        
-        comb_stat=defaultdict(int)
-        list_stat=defaultdict(list)
-
-        outfile=open(output[0],"w")
-        print(input)
-
-        for statfile in input:
-            with open(statfile) as infile:
-                for line in infile:
-                    print(line)
-                    statid, statval = line.strip().split()
-                    statval = int(statval)
-                    comb_stat[statid] += statval
-                    list_stat[statid].append(statval)
-
-        for key,value in list_stat.items():
-            value.append(comb_stat[key])
-            print(key,*value,file=outfile)
-
-        outfile.close()
-
-
-rule modify_minigraph:
-    input:  "graph/minigraph/graph_{chromo}.gfa"
-    output: "graph/minigraph/graph_{chromo}_path.gfa"
-    threads:10
-    resources:
-        mem_mb=2000 ,
-        walltime= "04:00"
-    shell:
-        """
-        vg convert -r 0 -g {input} -f > {output}
-
-        """
-
-rule minigraph_graph_statistics:
-        input:"graph/minigraph/graph_{chromo}_path.gfa"
-        output:"graph/minigraph/graph_{chromo}_stat.tsv"
-        threads:10
-        resources:
-           mem_mb=8000 ,
-           walltime= "04:00"
-        params:
-            ref=ref_genome
-        shell:
-           """
-
-            ./graph_stat.py  -g {input}  -o {output} -r {wildcards.chromo}_{params.ref} -t minigraph
-
-           """
-
-
-localrules: minigraph_combine_stat
-rule minigraph_combine_stat:
-    input:expand("graph/minigraph/graph_{chromo}_stat.tsv",chromo=chromo_list),
-    output:"graph/minigraph/minigraph_combine_stat.tsv"
-    threads: 20
-    resources:
-        mem_mb=2000,
-        walltime="04:00"
-    run:
-
-        from collections import defaultdict
-        
-        comb_stat=defaultdict(int)
-        list_stat=defaultdict(list)
-
-        outfile=open(output[0],"w")
-        print(input)
-
-        for statfile in input:
-            with open(statfile) as infile:
-                for line in infile:
-                    print(line)
-                    statid, statval = line.strip().split()
-                    statval = int(statval)
-                    comb_stat[statid] += statval
-                    list_stat[statid].append(statval)
-
-        for key,value in list_stat.items():
-            value.append(comb_stat[key])
-            print(key,*value,file=outfile)
-
-        outfile.close()
-
