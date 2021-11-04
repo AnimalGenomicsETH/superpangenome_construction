@@ -3,7 +3,9 @@
 dirwork="/cluster/work/pausch/danang/psd/scratch/real_yak2"
 #chromo_list = list(range(25, 26))
 #chromo_list = [13,19,5,23,6,9]
-chromo_list = list(range(1,30))
+#chromo_list = list(range(1,30))
+#chromo_list=[2,3] + list(range(5,30))
+chromo_list=list(range(1,3))
 assemb_list = ["UCD","Angus","Highland","OBV","Brahman","Yak","BSW","Pied","Gaur","Nellore"]
 #assemb_list = ["UCD","Angus"]
 ref_genome = "UCD"
@@ -13,14 +15,20 @@ jobstore="/cluster/scratch/cdanang/cactus_dump"
 
 rule all:
     input:
-        expand("assembly/{chromo}/{chromo}_rep/{breed}_{chromo}.fa.masked",chromo=chromo_list,breed=assemb_list),
-        expand("graph/cactus/cactus_{chromo}_seqfile.tsv",chromo=chromo_list),
-        expand("graph/cactus/cactus_{chromo}.hal",chromo=chromo_list),
-	expand("graph/cactus/cactus_{chromo}.vg",chromo=chromo_list),
-	expand("graph/cactus/cactus_{chromo}.gfa",chromo=chromo_list),
-        expand("graph/cactus/cactus_simple_{chromo}.gfa",chromo=chromo_list),
-        expand("graph/cactus/cactus_stat_{chromo}.tsv",chromo=chromo_list),
-        "graph/cactus/cactus_combine_stat.tsv"
+        #expand("assembly/{chromo}/{chromo}_rep/{breed}_{chromo}.fa.masked",chromo=chromo_list,breed=assemb_list),
+        #expand("graph/cactus/cactus_{chromo}_seqfile.tsv",chromo=chromo_list),
+        #expand("graph/cactus/cactus_{chromo}.hal",chromo=chromo_list),
+	#expand("graph/cactus/cactus_{chromo}.vg",chromo=chromo_list),
+	#expand("graph/cactus/cactus_{chromo}.gfa",chromo=chromo_list),
+        #expand("graph/cactus/cactus_simple_{chromo}.gfa",chromo=chromo_list),
+        #expand("graph/cactus/cactus_stat_{chromo}.tsv",chromo=chromo_list),
+        #"graph/cactus/cactus_combine_stat.tsv",
+        #"graph/pggb/pggb_combine_stat.tsv",
+	#"graph/minigraph/minigraph_combine_stat.tsv",
+        "graph/minigraph/graph_minigraph_combined.gfa",
+        "graph/cactus/cactus_combined.gfa",
+        expand("graph/cactus/cactus_{chromo}_snarl.tsv",chromo=chromo_list),
+        expand("graph/minigraph/minigraph_{chromo}_snarl.tsv",chromo=chromo_list),
 
 
     
@@ -224,3 +232,215 @@ rule cactus_combine_stat:
             print(key,*value,file=outfile)
 
         outfile.close()
+
+#stat pggb and minigraph
+# will delete later
+
+rule pggb_stat:
+    input:"graph/pggb_{chromo}/pggb_{chromo}.gfa"
+    output:"graph/pggb/pggb_stat_{chromo}.tsv"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    params:
+        ref=ref_genome
+    shell:
+        """
+
+        ./graph_stat_mod.py -g {input} -o {output} -r {wildcards.chromo}_{params.ref}
+
+
+        """
+
+
+localrules: pggb_combine_stat
+rule pggb_combine_stat:
+    input:expand("graph/pggb/pggb_stat_{chromo}.tsv",chromo=chromo_list),
+    output:"graph/pggb/pggb_combine_stat.tsv"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    run:
+
+        from collections import defaultdict
+        
+        comb_stat=defaultdict(int)
+        list_stat=defaultdict(list)
+
+        outfile=open(output[0],"w")
+        print(input)
+
+        for statfile in input:
+            with open(statfile) as infile:
+                for line in infile:
+                    print(line)
+                    statid, statval = line.strip().split()
+                    statval = int(statval)
+                    comb_stat[statid] += statval
+                    list_stat[statid].append(statval)
+
+        for key,value in list_stat.items():
+            value.append(comb_stat[key])
+            print(key,*value,file=outfile)
+
+        outfile.close()
+
+
+rule modify_minigraph:
+    input:  "graph/minigraph/graph_{chromo}.gfa"
+    output: "graph/minigraph/graph_{chromo}_path.gfa"
+    threads:10
+    resources:
+        mem_mb=2000 ,
+        walltime= "04:00"
+    shell:
+        """
+        vg convert -r 0 -g {input} -f > {output}
+
+        """
+
+rule minigraph_graph_statistics:
+        input:"graph/minigraph/graph_{chromo}_path.gfa"
+        output:"graph/minigraph/graph_{chromo}_stat.tsv"
+        threads:10
+        resources:
+           mem_mb=8000 ,
+           walltime= "04:00"
+        params:
+            ref=ref_genome
+        shell:
+           """
+
+            ./graph_stat.py  -g {input}  -o {output} -r {wildcards.chromo}_{params.ref} -t minigraph
+
+           """
+
+
+localrules: minigraph_combine_stat
+rule minigraph_combine_stat:
+    input:expand("graph/minigraph/graph_{chromo}_stat.tsv",chromo=chromo_list),
+    output:"graph/minigraph/minigraph_combine_stat.tsv"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    run:
+
+        from collections import defaultdict
+        
+        comb_stat=defaultdict(int)
+        list_stat=defaultdict(list)
+
+        outfile=open(output[0],"w")
+        print(input)
+
+        for statfile in input:
+            with open(statfile) as infile:
+                for line in infile:
+                    print(line)
+                    statid, statval = line.strip().split()
+                    statval = int(statval)
+                    comb_stat[statid] += statval
+                    list_stat[statid].append(statval)
+
+        for key,value in list_stat.items():
+            value.append(comb_stat[key])
+            print(key,*value,file=outfile)
+
+        outfile.close()
+
+
+
+rule combine_cactus:
+    input:expand("graph/cactus/cactus_simple_{chromo}.gfa",chromo=chromo_list)
+    output:
+        full_graph="graph/cactus/cactus_combined.vg",
+        full_graph_gfa="graph/cactus/cactus_combined.gfa"
+    threads: 20
+    resources:
+        mem_mb = 5000,
+        walltime = "04:00"
+    shell:
+        """
+
+        vg combine {input} > {output.full_graph}
+        vg convert -t {threads} -f {output.full_graph} > {output.full_graph_gfa}
+
+        """
+
+rule combine_minigraph:
+    input:  expand("graph/minigraph/graph_{chromo}_path.vg",chromo=chromo_list)
+    output:
+        full_graph="graph/minigraph/graph_minigraph.vg",
+        full_graph_gfa="graph/minigraph/graph_minigraph_combined.gfa",
+    threads: 10
+    resources:
+        mem_mb = 2000,
+        walltime = "04:00"
+    shell:
+        """
+
+        vg combine {input} > {output.full_graph}
+
+        vg convert -t {threads} -f {output.full_graph} > {output.full_graph_gfa}
+
+        """
+
+
+
+## deconstruct to identify snarl 
+
+rule deconstruct_minigraph:
+    input:"graph/minigraph/graph_{chromo}_path.gfa"
+    output:"graph/minigraph/minigraph_{chromo}_snarl.tsv"
+    threads: 10
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    params:
+        ref=ref_genome
+    shell:
+        """
+        
+        vg deconstruct -t {threads} -p {wildcards.chromo}_{params.ref} {input} > {output}
+        
+        """
+
+rule deconstruct_cactus:
+    input:"graph/cactus/cactus_simple_{chromo}.gfa"
+    output:"graph/cactus/cactus_{chromo}_snarl.tsv"
+    threads: 10
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    params:
+        ref=ref_genome
+    shell:
+        """
+        # all level of snarls (including nested), -a
+        # that only part of the paths, -e
+
+        vg deconstruct -e -a -t {threads} -p {params.ref}.{wildcards.chromo}_{params.ref} {input} > {output}
+
+        """
+
+
+rule deconstruct_pggb:
+    input:"graph/cactus/cactus_simple_{chromo}.gfa"
+    output:"graph/cactus/cactus_{chromo}_snarl.tsv"
+    threads: 10
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    params:
+        ref=ref_genome
+    shell:
+        """
+        # all level of snarls (including nested), -a
+        # that only part of the paths, -e
+
+        vg deconstruct -e -a -t {threads} -p {wildcards.chromo}_{params.ref} {input} > {output}
+
+        """
