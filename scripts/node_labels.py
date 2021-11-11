@@ -43,9 +43,10 @@ if __name__ == "__main__":
                         node_comb[comp].label.append(label_id)
 
     with open(output,"w") as outfile:
-        outfile.write("node_id\tnode_len\tnode_label\tshort_label\tRef_status\n")
+        outfile.write("node_id\tnode_len\tnode_label\tshort_label\tRef_status\tNode_stat\n")
         for key,value in node_comb.items():
             ref_status = "R" if reference in value.label else "NR"
             short_label="".join(x[0] for x in sorted(value.label)) 
-            print(value.name,value.length,",".join(sorted(value.label)),short_label,ref_status,sep="\t",file=outfile)
+            node_stat="R" if reference in value.label else short_label
+            print(value.name,value.length,",".join(sorted(value.label)),short_label,ref_status,node_stat,sep="\t",file=outfile)
 
