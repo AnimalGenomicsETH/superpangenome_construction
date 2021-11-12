@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import re
 
 def parse_args():
     parser = argparse.ArgumentParser(description = __doc__,
@@ -30,6 +31,12 @@ if __name__ == "__main__":
     delt_sv=0
     with open(input_file) as infile:
         for line in infile:
+            if line.startswith("#CHROM") and (statlen or args.svonly):
+                if args.svonly:
+                    line_comp=line.strip().split()
+                    print(*line_comp[0:4], *[x.split(".")[0] for x in line_comp[9:len(line_comp)]],sep="\t")
+                else:
+                    print(line.strip()
             if not line.startswith('#'):
                 all_var+=1
                 token=line.strip().split()
@@ -66,7 +73,18 @@ if __name__ == "__main__":
                         if comp < ref_len:
                             delt_sv += 1
                 if statlen:
-                    print(token[0],token[1],token[2],ref_len,alt_len,*token[5:len(token)],sep="\t")
+                    alt_len_list=[]
+                    for x in token[9:len(token)]:
+                        if re.search(r"/|\.",x):
+                            alt_len_list.append(x)
+                        else:
+                            x=int(x)
+                            if x:
+                                alt_len_list.append(alt_len[int(x)-1])
+                            else:
+                                alt_len_list.append('R')
+                    #print(token[0],token[1],token[2],ref_len,alt_len,*token[9:len(token)],sep="\t")
+                    print(token[0],token[1],token[2],ref_len,*alt_len_list,sep="\t")
     if not statlen and not args.svonly:
         print(all_var,max_len,snp_var,sv_var,bial_var,multi_var,subt,ins,delt,subt_sv,ins_sv,delt_sv)
 
