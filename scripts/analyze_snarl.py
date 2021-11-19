@@ -36,7 +36,7 @@ if __name__ == "__main__":
                     line_comp=line.strip().split()
                     print(*line_comp[0:4], *[x.split(".")[0] for x in line_comp[9:len(line_comp)]],sep="\t")
                 else:
-                    print(line.strip()
+                    print(line.strip())
             if not line.startswith('#'):
                 all_var+=1
                 token=line.strip().split()
