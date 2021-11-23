@@ -9,6 +9,8 @@ import sys
 first_file=sys.argv[1]
 second_file=sys.argv[2]
 tolerated = int(sys.argv[3])
+first_graph=sys.argv[4]
+second_graph=sys.argv[5]
 
 
 in1=open(first_file,"r")
@@ -34,14 +36,11 @@ while True:
             #print([first_comp,second_comp])
             if coord_sel == first_coord:
                 #comb_coord.append(second_coord)
-                comb_coord.append(first_comp)
+                comb_coord.extend([first_coord,first_graph])
             else:
-                #print([*comp[0],*comp[1] for comp in comb_coord])
-                if comb_coord:
-                    #print(*comb_coord[0],*comb_coord[1])
-                    print(*comb_coord)
+                print(*comb_coord)
                 coord_sel = first_coord
-                comb_coord=[first_comp,first_graph,second_comp,second_graph]
+                comb_coord=[first_coord,first_graph,second_coord,second_graph]
             #print(first_coord,second_coord)
 
         try:
@@ -57,13 +56,11 @@ while True:
             #print([first_comp,second_comp])
             #print(first_coord,second_coord)
             if coord_sel == first_coord:
-                comb_coord.append(second_comp)
+                comb_coord.extend([second_coord,second_graph])
             else:
-                if comb_coord:
-                    print(*comb_coord[0],*comb_coord[1])
-                #print(*first,*second for first,second in comb_coord)
+                print(*comb_coord)
                 coord_sel = first_coord
-                comb_coord=[first_comp,second_comp]
+                comb_coord=[first_coord,first_graph,second_coord,second_graph]
 
         try:
             second_comp = in2.readline().strip().split()
