@@ -76,14 +76,21 @@ if __name__ == "__main__":
                 if statlen:
                     alt_len_list=[]
                     for x in token[9:len(token)]:
-                        if re.search(r"/|\.",x):
-                            alt_len_list.append(x)
+                        ref_len=int(len(token[3]))
+                        if re.search(r"\.",x):
+                            alt_len_list.append(".")
+                        elif re.search(r"/",x):
+                            selint=x.split("/")[0]
+                            if selint == ".":
+                                alt_len_list.append(ref_len)
+                            else:
+                                alt_len_list.append(alt_len[int(selint)-1]-ref_len)
                         else:
                             x=int(x)
                             if x:
-                                alt_len_list.append(alt_len[int(x)-1])
+                                alt_len_list.append(alt_len[int(x)-1]-ref_len)
                             else:
-                                alt_len_list.append('R')
+                                alt_len_list.append(0)
                     #print(token[0],token[1],token[2],ref_len,alt_len,*token[9:len(token)],sep="\t")
                     print(token[0],token[1],token[2],ref_len,*alt_len_list,sep="\t")
     if not statlen and not args.svonly:
