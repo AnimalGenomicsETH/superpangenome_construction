@@ -212,26 +212,53 @@ rule combine_genome:
 
         """
 
+#rule construct_pggb:
+#    input:
+#        "comb_chromo/{chromo}_comb.fa"
+#    output:
+#        "graph/pggb_{chromo}/pggb_{chromo}.gfa"
+#    threads: 32
+#    resources:
+#        mem_mb = 2000,
+#        walltime = "24:00"
+#    params:
+#        sifdir = sifdir,
+#        dirwork = dirwork
+#    shell:
+#        """
+#
+#        singularity run --bind {params.dirwork} {params.sifdir}/pggb.sif \
+#        'pggb -i {input} -t {threads} -s 100000 -p 90 -n 10 \
+#        -S -o graph/pggb_{wildcards.chromo}'
+#
+#        ln -s --relative graph/pggb_{wildcards.chromo}/*.smooth.gfa {output}
+#
+#        """
+
 rule construct_pggb:
     input:
         "comb_chromo/{chromo}_comb.fa"
     output:
         "graph/pggb_{chromo}/pggb_{chromo}.gfa"
-    threads: 32
+    threads: 20
     resources:
-        mem_mb = 2000,
-        walltime = "24:00"
+        mem_mb = 10000,
+        walltime = "48:00",
+        disc_scratch = 30
     params:
         sifdir = sifdir,
         dirwork = dirwork
     shell:
         """
+        cp {input} {input}.fai $TMPDIR
+        
+        cd $TMPDIR 
 
-        singularity run --bind {params.dirwork} {params.sifdir}/pggb.sif \
-        'pggb -i {input} -t {threads} -s 100000 -p 90 -n 10 \
-        -S -o graph/pggb_{wildcards.chromo}'
+        singularity run --bind $TMPDIR {params.sifdir}/pggb.sif \
+        'pggb -i {wildcards.chromo}_comb.fa -t {threads} -s 100000 -p 80 -n 10 \
+        -S -o graph'
 
-        ln -s --relative graph/pggb_{wildcards.chromo}/*.smooth.gfa {output}
+        cp graph/*.smooth.gfa $LS_SUBCWD/{output}
 
         """
 
