@@ -49,8 +49,9 @@ def optional_output(run_mapping,run_cactus):
 rule all:
     input: expand("graph/minigraph/graph_{chromo}.gfa", chromo=chromo_list),
            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa", chromo=chromo_list),
+	   "graph/pggb/pggb_combine_stat.tsv",
            #expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
-        #    expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
+           #expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
            #expand("graph/{prog}/graph_{prog}.{ind}",prog=prog_list, ind=index_list),
            optional_output(run_mapping,run_cactus),
@@ -289,6 +290,55 @@ rule convert_ppgb:
 
         """
 
+
+rule stat_perchromo_pggb:
+    input : "graph/pggb_{chromo}/pggb_{chromo}.gfa"
+    output : "graph/pggb_{chromo}/pggb_{chromo}_stat.tsv"
+    threads: 10
+    resources:
+        mem_mb=5000,
+        walltime="01:00"
+    params: ref = ref_genome
+    shell:
+        """
+
+        graph_stat_mod.py -g {input} -o {output} -r {wildcards.chromo}_{params.ref}
+
+        """
+
+
+localrules: pggb_combine_stat
+rule pggb_combine_stat:
+    input:expand("graph/pggb_{chromo}/pggb_{chromo}_stat.tsv",chromo=chromo_list),
+    output:"graph/pggb/pggb_combine_stat.tsv"
+    threads: 20
+    resources:
+        mem_mb=2000,
+        walltime="04:00"
+    run:
+
+        from collections import defaultdict
+
+        comb_stat=defaultdict(int)
+        list_stat=defaultdict(list)
+
+        outfile=open(output[0],"w")
+        print(input)
+
+        for statfile in input:
+            with open(statfile) as infile:
+                for line in infile:
+                    print(line)
+                    statid, statval = line.strip().split()
+                    statval = int(statval)
+                    comb_stat[statid] += statval
+                    list_stat[statid].append(statval)
+
+        for key,value in list_stat.items():
+            value.append(comb_stat[key])
+            print(key,*value,file=outfile)
+
+        outfile.close()
 
 # rule combine_pggb:
 #     input:  expand("graph/pggb_{chromo}/pggb_{chromo}.{{impgr}}",chromo=chromo_list,impgr=impgr_list)
