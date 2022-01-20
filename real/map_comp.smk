@@ -50,6 +50,7 @@ rule all:
     input: expand("graph/minigraph/graph_{chromo}.gfa", chromo=chromo_list),
            expand("graph/pggb_{chromo}/pggb_{chromo}.gfa", chromo=chromo_list),
 	   "graph/pggb/pggb_combine_stat.tsv",
+           "graph/pggb/pggb_combined.og",
            #expand("graph/{prog}/graph_{prog}_test.{impgr}",prog=prog_list,impgr=impgr_list),
            #expand("graph/{prog}/graph_{prog}_chop.vg",prog=prog_list)
            #expand("graph/pggb/graph_pggb_chop_test.{impgr}", impgr=impgr_list),
@@ -240,7 +241,8 @@ rule construct_pggb:
     input:
         "comb_chromo/{chromo}_comb.fa"
     output:
-        "graph/pggb_{chromo}/pggb_{chromo}.gfa"
+       gfa = "graph/pggb_{chromo}/pggb_{chromo}.gfa",
+       og = "graph/pggb_{chromo}/pggb_{chromo}.og"
     threads: 20
     resources:
         mem_mb = 10000,
@@ -259,7 +261,8 @@ rule construct_pggb:
         'pggb -i {wildcards.chromo}_comb.fa -t {threads} -s 100000 -p 80 -n 10 \
         -S -o graph'
 
-        cp graph/*.smooth.gfa $LS_SUBCWD/{output}
+        cp graph/*.smooth.gfa $LS_SUBCWD/{output.gfa}
+        cp graph/*.smooth.og $LS_SUBCWD/{output.og}
 
         """
 
@@ -339,6 +342,25 @@ rule pggb_combine_stat:
             print(key,*value,file=outfile)
 
         outfile.close()
+
+#faster combining with odgi
+rule combine_pggb_og:
+    input:expand("graph/pggb_{chromo}/pggb_{chromo}.og",chromo=chromo_list)
+    output:"graph/pggb/pggb_combined.og"
+    threads: 20
+    resources:
+        mem_mb = 5000,
+        walltime = "04:00"
+    shell:
+        """
+        for chromo in {1..29}
+        do
+            echo pggb_${chromo}/pggb_${chromo}.og >> graph/pggb/combined_list.tsv
+        done
+
+
+        odgi squeeze -f graph/pggb/combined_list.tsv -t {threads} -o {output}
+        """
 
 # rule combine_pggb:
 #     input:  expand("graph/pggb_{chromo}/pggb_{chromo}.{{impgr}}",chromo=chromo_list,impgr=impgr_list)
