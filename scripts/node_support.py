@@ -11,7 +11,7 @@ out_file: similar like sv vcf file but add support (all_allele, ref, min alt, ma
 import sys
 import re
 from collections import defaultdict
-
+from statistics import mean
 
 def node_coverage(input_file):
     nodesup=defaultdict(int)
@@ -28,6 +28,7 @@ def allele_checker(allele,nodesup):
     sup = []
     for comp in allele:
         sup.append(nodesup.get(comp,0))
+    #return round(mean(sup),2)
     return min(sup)
 
 
