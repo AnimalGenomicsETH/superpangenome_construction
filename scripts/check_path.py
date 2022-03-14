@@ -39,12 +39,12 @@ if __name__ == "__main__":
                     parent, child = [int(comp[:-1]), int(nodes_list[ind+1][:-1])]
                     edge_comb[breed][parent].add(child)
                     edge_comb[breed][child].add(parent)
-    for key, value in edge_comb.items():
-        for comb1, comb2 in value.items():
-            print(key,comb1,comb2)
+    # for key, value in edge_comb.items():
+        # for comb1, comb2 in value.items():
+            # print(key,comb1,comb2)
 
     #in_path, out_path, not_found 
-    support_res = defaultdict(lambda: [0,0,0])
+    support_res = defaultdict(lambda: [0,0,0,0])
     with open(align) as infile:
         for line in infile:
             token=line.strip().split()
@@ -54,18 +54,25 @@ if __name__ == "__main__":
                 if comp:
                     parent = int(comp) 
                     child = int(node_comp[ind+1])
-                    print(parent,child)
+                    #print(breed,parent,child)
                     if edge_comb[breed].get(parent,0) and edge_comb[breed].get(child,0):
-                        if edge_comb[parent].get(child,0):
+                        support_res[breed][2] += 1 
+                        support_res[breed][2] += 1 
+                        print(edge_comb[parent])
+                        print(edge_comb[child])
+                        if child in edge_comb[breed][parent]:
                             support_res[breed][0] += 1
-                        elif edge_comb[child].get(parent,0):
+                        elif parent in edge_comb[breed][child]:
                             support_res[breed][0] += 1
                         else:
                             support_res[breed][1] += 1
                     else:
-                        support_res[breed][2] += 1
-    
+                        if not edge_comb[breed].get(parent,0):
+                            support_res[breed][3] += 1
    
+                        if not edge_comb[breed].get(child,0):
+                            support_res[breed][3] += 1
+
     for key, value in support_res.items():
         print(key,*value)
 
