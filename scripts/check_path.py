@@ -58,8 +58,8 @@ if __name__ == "__main__":
                     if edge_comb[breed].get(parent,0) and edge_comb[breed].get(child,0):
                         support_res[breed][2] += 1 
                         support_res[breed][2] += 1 
-                        print(edge_comb[parent])
-                        print(edge_comb[child])
+                        # print(edge_comb[parent])
+                        # print(edge_comb[child])
                         if child in edge_comb[breed][parent]:
                             support_res[breed][0] += 1
                         elif parent in edge_comb[breed][child]:
