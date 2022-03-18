@@ -6,7 +6,7 @@ There are many hardcoded filepaths
 
 """
 
-chromo_list=range(1,3)
+chromo_list=range(20,25)
 chromo_dir="/cluster/work/pausch/danang/psd/scratch/real_comp/comb_chromo"
 
 
@@ -32,7 +32,7 @@ rule split_fasta:
     shell:
         """
 
-        samtools faidx {input} {wildcards.chromo} {wildcards.anim} > {output.breed_fasta}
+        samtools faidx {input} {wildcards.chromo}_{wildcards.anim} > {output.breed_fasta}
         
         split_fa.py {output.breed_fasta} 1000000 > {output.split_fasta}
 
@@ -55,8 +55,8 @@ rule align_to_graph:
     output:"align_graph/{chromo}_{prog}_{anim}.gaf"
     threads:15
     resources:
-        mem_mb= 1000,
-        walltime= ""
+        mem_mb= 5000,
+        walltime= "01:00"
     shell:
         """
 
