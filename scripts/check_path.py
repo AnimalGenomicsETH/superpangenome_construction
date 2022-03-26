@@ -21,6 +21,7 @@ def parse_args():
                     formatter_class = argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-g","--graph",help="input graph file")
     parser.add_argument("-a","--align",help="alignment file")
+    parser.add_argument("-b","--breedalign",help="breed to use when differ")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -48,7 +49,7 @@ if __name__ == "__main__":
     with open(align) as infile:
         for line in infile:
             token=line.strip().split()
-            breed = re.findall(r"[A-Za-z]+",token[0])[0]
+            breed =[args.breedalign if args.breedalign else re.findall(r"[A-Za-z]+",token[0])[0]][0]
             node_comp = token[5].replace(">","<").split("<")
             for ind,comp in enumerate(node_comp[:-1]):
                 if comp:
