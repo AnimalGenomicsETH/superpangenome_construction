@@ -62,7 +62,7 @@ rule align_to_graph:
 
         module load gcc/6.3.0
 
-        GraphAligner -g {input.graph} -f {input.fasta} -a {output} -t 10 -x vg
+        GraphAligner -g {input.graph} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t 10 -x vg
         
         """
 
