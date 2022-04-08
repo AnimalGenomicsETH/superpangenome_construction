@@ -27,7 +27,7 @@ def node_calc(node_cum):
     non_ref_node_len = 0
 
     for key, value in node_cum.items():
-        id = value.id
+        nodeid = value.nodeid
         nodelen = value.nodelen
         rtype = value.rtype
 
@@ -52,7 +52,7 @@ def small_node_calc(node_cum):
 
     for key, value in node_cum.items():
         if value.nodelen < 50:
-            id = value.id
+            nodeid = value.nodeid
             nodelen = value.nodelen
             rtype = value.rtype
 
@@ -116,9 +116,10 @@ def core_flexible_calc(node_count,breed_count,node_cum):
 
 @dataclass
 class node_stats:
-    id: str
+    nodeid: str
     nodelen: int
     rtype: int
+    nodeseq: str
 
 
 if __name__ == "__main__":
@@ -159,8 +160,9 @@ if __name__ == "__main__":
         if line.startswith("S"):
             node_id = line_comp[1]
             node_len = len(line_comp[2])
+            node_seq = line_comp[2]
             # rtype 0 as nonref
-            node_cum[node_id] = node_stats(id=node_id, nodelen=node_len, rtype=0)
+            node_cum[node_id] = node_stats(nodeid=node_id, nodelen=node_len, nodeseq=node_seq, rtype=0)
             # in minigraph we use the rank to determine ref path
             # the minigraph has been converted as compatible pggb graph
             #if grtype == "minigraph":
@@ -191,6 +193,12 @@ if __name__ == "__main__":
 
     input_file.close()
 
+    for key,values in node_cum.items():
+        if not values.rtype:
+            if values.nodelen >= 50:
+                print(f">{values.nodeid}")
+                print(values.nodeseq)
+
 
     # total_node, len_node, ref_node, ref_node_len, non_ref_node, non_ref_node_len = node_calc(node_stats)
     # print(graph, grtype, "nodes", *node_calc(node_cum), file=outfile)
@@ -200,7 +208,7 @@ if __name__ == "__main__":
 
     # make the output become more informative
     node_info = ["total_nodes", "len_nodes", "ref_nodes", "ref_nodes_len", "non_ref_nodes", "non_ref_nodes_len"]
-    edge_info = ["total_edges", "Ref-Ref edges", "Ref-Nonref edges", "Nonref-Nonref edges"]
+    edge_info = ["total_edges", "Ref-Ref_edges", "Ref-Nonref_edges", "Nonref-Nonref_edges"]
     flexible_info = ["core_nodes", "private_nodes", "flexible_nodes",
                      "all_nodes", "core_len", "private_len", "flexible_len", "all_len"]
     node_info_small = [x + "_small" for x in node_info]
