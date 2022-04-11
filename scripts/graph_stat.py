@@ -136,7 +136,6 @@ if __name__ == "__main__":
             # TODO: formalize ref name
             #ref_cac = str(comp) + "_UCD." + str(comp)
             ref_cac = str(comp) + "." +  str(comp)
-            print(ref_cac)
             ref.append(ref_cac)
 
     output_file = args.output
