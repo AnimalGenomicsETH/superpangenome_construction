@@ -11,7 +11,7 @@ def parse_args():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-g", "--graph", help="graph to calculate statistics", required=True)
     parser.add_argument("-o", "--output", help="where to put the statistics", required=True)
-    parser.add_argument("-r", "--ref", help="reference path", required=True, nargs='+')
+    parser.add_argument("-r", "--ref", help="reference path", required=True)
     # TODO: need to work on this, to generalize, now using regex from contig name 
     parser.add_argument("-n", "--nonref", help="non-reference path sample", nargs='+')
     parser.add_argument("-t", "--grtype", help="type of graph", choices=["cactus", "pggb", "minigraph"], required=True)
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             child_node = line_comp[3]
             edge_cum.append([parent_node, child_node])
         elif line.startswith("P"):
-            if line_comp[1] in ref:
+            if re.search(pattern=ref,string=line_comp[1]):
                 # split all node in path
                 for comp in line_comp[2].split(","):
                     node_comp = comp[:-1]
