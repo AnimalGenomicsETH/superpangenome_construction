@@ -14,6 +14,9 @@ chromo_dir="/cluster/work/pausch/danang/psd/scratch/real_comp/comb_chromo"
 breed_list = [ x.strip() for x in open("breed_list.tsv").readlines() ]
 program_list = ["cactus","pggb","minigraph"]
 
+# length of split fasta for graphaligner alignment 
+break_length=100000
+
 rule all:
     input:
         expand("stat_graph/{chromo}_{prog}_{anim}_pathstat.tsv",chromo=chromo_list,prog=program_list,anim=breed_list),
@@ -29,12 +32,14 @@ rule split_fasta:
     resources:
         mem_mb=2000 ,
         walltime= "01:00"
+    params:
+        break_length=break_length
     shell:
         """
 
         samtools faidx {input} {wildcards.chromo}_{wildcards.anim} > {output.breed_fasta}
         
-        split_fa.py {output.breed_fasta} 1000000 > {output.split_fasta}
+        split_fa.py {output.breed_fasta} {params.break_length}  > {output.split_fasta}
 
         """
 
