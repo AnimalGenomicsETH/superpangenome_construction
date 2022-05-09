@@ -13,6 +13,14 @@ import gzip
 from collections import defaultdict
 
 
+def calculate_concordance_metrics(all_geno_match):
+    
+    return( { "Concordance": round( sum(all_geno_match[x] for x in [0,4,8])/sum(all_geno_match[x] for x in range(0,9)) , 5),
+               "NR_sensitivity": round( sum(all_geno_match[x] for x in [4,5,7,8])/sum(all_geno_match[x] for x in [1,2,4,5,7,8,10,11]) , 5),
+               "NR_discrepancy" : round (sum(all_geno_match[x] for x in [2,3,5,6,7])/sum(all_geno_match[x] for x in range(1,9)), 5),
+               "Precision" : round( sum(all_geno_match[x] for x in [4,8])/sum(all_geno_match[x] for x in range(3,9)) ,5 ) 
+            })
+
 #if more than two files: Combining concordance stat from single chromosome results
 if len(sys.argv) > 3:
     concor_table = defaultdict(lambda: [0 for x in range(0,12)])
@@ -22,16 +30,19 @@ if len(sys.argv) > 3:
                 token=line.strip().split()
                 if len(token) > 10:
                     anim_id=token[0]
-                    for ind,comp in enumerate(token[1:]):
+                    for ind,comp in enumerate(token[1:13]):
                         concor_table[anim_id][ind] += int(comp)
-    # Concordance calculation
-    all_geno_match = concor_table["All"]
 
-    # concordance stat
-    print("Concordance", sum(all_geno_match[x] for x in [0,4,8])/sum(all_geno_match[x] for x in range(0,9)))
-    print("NR Sensitivity", sum(all_geno_match[x] for x in [4,5,7,8])/sum(all_geno_match[x] for x in [1,2,4,5,7,8,10,11]))
-    print("NR Discrepancy", sum(all_geno_match[x] for x in [2,3,5,6,7])/sum(all_geno_match[x] for x in range(1,9)))
-    print("Precision", sum(all_geno_match[x] for x in [4,8])/sum(all_geno_match[x] for x in range(3,9)))
+
+    # Concordance per sample 
+    for key,value in concor_table.items():
+        print(key,*value, *calculate_concordance_metrics(value).values()  )
+        if key == "All":
+            # Overall concordance
+            print("----")
+            print("Overall stats")
+            for key2,value2 in calculate_concordance_metrics(value).items():
+                print(key2,value2)
 
     sys.exit(0)
 
@@ -146,20 +157,20 @@ while True:
             truth_pos=truth_line[1]
     # end of list, calculate stat
     except StopIteration:
-        #print(concor_table)
         all_geno_match = [0 for x in range(0,12)]
         # per anim stat
         for key,value in concor_table.items():
-            print(key,*value)
+            print(key,*value, *calculate_concordance_metrics(value).values() )
             for ind,x in enumerate(value):
                 all_geno_match[ind] += x
+
         # combine stat
-        print("All",*all_geno_match)
-        # concordance stat
-        print("Concordance", sum(all_geno_match[x] for x in [0,4,8])/sum(all_geno_match[x] for x in range(0,9)))
-        print("NR Sensitivity", sum(all_geno_match[x] for x in [4,5,7,8])/sum(all_geno_match[x] for x in [1,2,4,5,7,8,10,11]))
-        print("NR Discrepancy", sum(all_geno_match[x] for x in [2,3,5,6,7])/sum(all_geno_match[x] for x in range(1,9)))
-        print("Precision", sum(all_geno_match[x] for x in [4,8])/sum(all_geno_match[x] for x in range(3,9)))
+        print("All",*all_geno_match, *calculate_concordance_metrics(all_geno_match).values())
+        # concordance stat per chromosome 
+        print("____")
+        for key,value in calculate_concordance_metrics(all_geno_match).items():
+            print(key, value)
+
         break
 
     # Index of match query and truth as in the paper
