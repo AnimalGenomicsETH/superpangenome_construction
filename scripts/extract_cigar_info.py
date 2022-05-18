@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 
-Given graph alingment with GraphAligner, extract cigar and summarize mutations in the alingment
+Given graph alingment with GraphAligner, extract cigar and summarize mutations in the alignment
 
 e.g., 
 
@@ -23,6 +23,8 @@ from collections import defaultdict
 
 
 mutcol = defaultdict(int)
+eventcol = defaultdict(int)
+
 with open(sys.argv[1]) as infile:
     for line in infile:
         if not line.startswith("#"):
@@ -37,6 +39,7 @@ with open(sys.argv[1]) as infile:
                     mutype=comp
                     mutsize=int(mutsize)
                     mutcol[mutype] += mutsize
+                    eventcol[mutype] += 1
                     mutsize=""
                     mutype=""
 
@@ -55,4 +58,4 @@ cigar_id = {
         }
 
 for key,value in mutcol.items():
-    print(key,cigar_id[key],value)
+    print(key,cigar_id[key],eventcol[key],value)

@@ -20,7 +20,7 @@ with open(sys.argv[1]) as infile:
                 for node in node_list:
                     node_label[node].append(breed)
 
-print("node_ID\tlong_label\tref_status\tshort_label\tnode_stat")
+print("node_ID\tlong_label\tref_status\tshort_label\tnode_stat\tnode_inf\tcolour")
 for key,values in node_label.items():
     if key:
         if key != "*":
@@ -28,5 +28,7 @@ for key,values in node_label.items():
             ref_status = "R" if "UCD" in values else "NR"
             short_label="".join(x[0] for x in sorted(values))
             node_stat="R" if "UCD" in values else short_label
-            print(key,long_label,ref_status,short_label,node_stat,sep="\t")
+            node_inf="R" if "UCD" in values else long_label
+            colour="orange" if ref_status == "NR" else "grey"
+            print(key,long_label,ref_status,short_label,node_stat,node_inf,colour,sep="\t")
 
