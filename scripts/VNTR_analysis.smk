@@ -54,9 +54,9 @@ def reverse_complement(seq):
 import regex
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
-    return {asm: len(regex.findall(f"{TR}{{e<={allowed_errors}}}",sequence)) for asm, sequence in sequences.items()}
+    return {asm: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence)) for asm, sequence in sequences.items()}
 
-def extract_fasta_regions(regions,outfile=1):
+def extract_fasta_regions(regions):
     sequences = {}
     for region in regions:
         parts= region.rstrip().split()
@@ -76,7 +76,7 @@ rule process_VNTRs:
     input:
         VNTRs = 'putative_VNTRs.{rate}.bed',
         beds = expand('{chr}/{asm}.bed',chr=range(1,30),asm=breeds),
-        fasta = expand('/cluster/work/pausch/danang/psd/scratch/assembly/{ch}/{asm}_{ch}.fa',chr=range(1,30),asm=breeds)
+        fasta = expand('/cluster/work/pausch/danang/psd/scratch/assembly/{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
     run:
@@ -94,7 +94,7 @@ rule process_VNTRs:
                     if len(counts)/len(breeds) < config.get('missing_rate',0):
                         continue
                     counts_clean = {regex.match( r'.*?_(.*):.*',k).group(1):v for k,v in counts.items()}
-                    print(','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,None) for b in breeds])),file=fout)
+                    print(','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,math.nan) for b in breeds])),file=fout)
                     
         #process lines, select good ones
         #extract local fasta

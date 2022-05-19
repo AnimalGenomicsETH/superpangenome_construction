@@ -1,0 +1,8 @@
+gfa_path: '/cluster/work/pausch/to_share/sv_analysis/new_minigraph/'
+ARS_TR: '/cluster/work/pausch/alex/VNTR_rpgg/input/ARS.TR.nonrep.bed'
+low: 10
+
+TR_low: 20
+TR_high: 100
+missing_rate: 0.5
+TR_divergence_limit: 0.2
