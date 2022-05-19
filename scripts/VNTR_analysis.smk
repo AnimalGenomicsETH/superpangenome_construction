@@ -1,4 +1,3 @@
-
 breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak']
 rule all:
     input:
@@ -11,8 +10,8 @@ wildcard_constraints:
 
 rule minigraph_call:
     input:
-        fasta = '/cluster/work/pausch/danang/psd/scratch/assembly/{chr}/{asm}_{chr}.fa',
-        gfa = '/cluster/work/pausch/to_share/sv_analysis/new_minigraph/minigraph_{chr}_bs.gfa' 
+        fasta = config['fasta_path'] + '{chr}/{asm}_{chr}.fa',
+        gfa = config['gfa_path'] + 'minigraph_{chr}_bs.gfa' 
     output:
         '{chr}/{asm}.bed'
     resources:
@@ -25,7 +24,7 @@ rule minigraph_call:
 rule gfatools_bubble:
     input:
         #expand(config['gfa_path'] + 'minigraph_{N}_bs.gfa',N=range(1,30))
-        expand('/cluster/work/pausch/to_share/sv_analysis/new_minigraph/minigraph_{N}_bs.gfa',N=range(1,30))
+        #expand('/cluster/work/pausch/to_share/sv_analysis/new_minigraph/minigraph_{N}_bs.gfa',N=range(1,30))
     output:
         'minigraph.SVs.bed'
     shell:
@@ -44,7 +43,8 @@ rule bedtools_intersect:
         threshold = lambda wildcards: int(wildcards.rate)/100
     shell:
         '''
-        bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} | awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' > {output}
+        #filters out duplicate lines where TRF can output multiple TRs
+        bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} | awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' | awk '!seen[$1$2$3$4]++' > {output}
         '''
 
 def reverse_complement(seq):
@@ -54,7 +54,8 @@ def reverse_complement(seq):
 import regex
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
-    return {asm: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence)) for asm, sequence in sequences.items()}
+    #could implement some sqrt approach, but then unequal meaning of divergence
+    return {asm: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True)) for asm, sequence in sequences.items()}
 
 def extract_fasta_regions(regions):
     sequences = {}
@@ -64,48 +65,62 @@ def extract_fasta_regions(regions):
         if name == '.':
             continue
         ix,low,high = name.split(':')[3:6]
-        offset = config.get('offset',500)
+        offset = config.get('offset',100)
         ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
-        header, sequence = subprocess.run(f'samtools faidx /cluster/work/pausch/danang/psd/scratch/assembly/{ch}/{asm}_{ch}.fa {ix}:{int(low)-offset}-{int(high)+offset} | seqtk seq -l 0',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         
+        if (int(high) - int(low)) > 10000:
+            print('TOO LONG SKIPPING',line)
+            
+        header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ix}:{int(low)-offset}-{int(high)+offset} | seqtk seq -l 0',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence.upper() if 'Angus' not in header else reverse_complement(sequence.upper())
     return sequences
 
 import math
+from multiprocessing import Pool
+
+def process_line(line):
+    chrom, start, end, nodes, count, TR = line.rstrip().split()
+    count = int(count)
+    if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
+        source, *_, sink = nodes.split(',')
+        regions = subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+        sequences = extract_fasta_regions(regions)
+
+        counts = count_VNTRs(sequences,TR)
+        if len(counts)/len(breeds) > config.get('missing_rate',0):
+            counts_clean = {regex.match( r'.*?_(.*):.*',k,concurrent=True).group(1):v for k,v in counts.items()}
+            return ','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,math.nan) for b in breeds]))
+    return
+
 rule process_VNTRs:
     input:
         VNTRs = 'putative_VNTRs.{rate}.bed',
         beds = expand('{chr}/{asm}.bed',chr=range(1,30),asm=breeds),
-        fasta = expand('/cluster/work/pausch/danang/psd/scratch/assembly/{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
+        fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
+    threads: 24
+    resources:
+        mem_mb = 2000,
+        walltime = '24:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join(breeds),file=fout)
-            for line in fin:
-                chrom, start, end, nodes, count, TR = line.rstrip().split()
-                count = int(count)
-                if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high'):
-                    source, *_, sink = nodes.split(',')
-                    regions = subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
-                    sequences = extract_fasta_regions(regions)
+            with Pool(threads) as p:
+                for result in p.imap(process_line, fin, 10):
+                    if result:
+                        print(result,file=fout)
 
-                    counts = count_VNTRs(sequences,TR)
-                    if len(counts)/len(breeds) < config.get('missing_rate',0):
-                        continue
-                    counts_clean = {regex.match( r'.*?_(.*):.*',k).group(1):v for k,v in counts.items()}
-                    print(','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,math.nan) for b in breeds])),file=fout)
-                    
-        #process lines, select good ones
-        #extract local fasta
-        #count VNTRs
+            #for line in fin:
+            #    chrom, start, end, nodes, count, TR = line.rstrip().split()
+            #    count = int(count)
+            #    if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high'):
+            #        source, *_, sink = nodes.split(',')
+            #        regions = subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+            #        sequences = extract_fasta_regions(regions)
 
-#rule localise_bed:
-#    input:
-#        expand('{{chr}}/{asm}.bed',asm=breeds)
-#    output:
-#        ''
-#    shell:
-#        '''
-#        awk '$1==S&&$2==$3'
-#        '''
+            #        counts = count_VNTRs(sequences,TR)
+            #        if len(counts)/len(breeds) < config.get('missing_rate',0):
+            #            continue
+            #        counts_clean = {regex.match( r'.*?_(.*):.*',k).group(1):v for k,v in counts.items()}
+            #        print(','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,math.nan) for b in breeds])),file=fout)
