@@ -35,6 +35,8 @@ rule gfatools_bubble:
         for i in {{0..28}}; do gfatools bubble ${{gfas[$i]}} | cut -f -3,12 | sed 's/_UCD//g'; done > {output}
         '''
 
+#bedtools merge -d 100 -c 4,5,6 -o distinct,sum,distinct -delim '|'  -i
+
 rule bedtools_intersect:
     input:
         bubbles = 'minigraph.SVs.bed',
@@ -50,10 +52,16 @@ rule bedtools_intersect:
         '''
 
 import regex
+from collections import defaultdict
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
     #could implement some sqrt approach, but then unequal meaning of divergence
-    return {asm.split('_')[1].split(':')[0]: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True)) for asm, sequence in sequences.items()}
+    counts = defaultdict(int)
+    for asm, sequence in sequences.items():
+        counts[asm.split('_')[1].split(':')[0]] += len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True))
+
+    return dict(counts)
+    #return {asm.split('_')[1].split(':')[0]: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True)) for asm, sequence in sequences.items()}
 
 def extract_fasta_regions(regions):
     sequences = {}
@@ -63,7 +71,7 @@ def extract_fasta_regions(regions):
         if name == '.':
             continue
         ix,low,high = name.split(':')[3:6]
-        offset = config.get('offset',100)
+        offset = config.get('flanks',100)
         ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
         
         if (int(high) - int(low)) > config.get('max_region_length',10000):
@@ -72,18 +80,25 @@ def extract_fasta_regions(regions):
 
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ix}:{int(low)-offset}-{int(high)+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
-        #.upper() if 'Angus' not in header else reverse_complement(sequence.upper())
     return sequences
 
 import math
 from multiprocessing import Pool
 
+import Levenshtein
+
 def process_line(line):
     chrom, start, end, nodes, count, TR = line.rstrip().split()
     count = int(count)
     if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
-        source, *_, sink = nodes.split(',')
-        regions = subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+        if '|' in TR:
+            TR = Levenshtein.median(TR.split('|'))
+
+        regions = []
+        for node in nodes.split('|'):
+            source, *_, sink = node.split(',')
+            #someway to handle multi-bubble
+            regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions)
 
         if len(sequences)/len(breeds) > config.get('missing_rate',0):
@@ -98,13 +113,16 @@ rule process_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 18
+    threads: 4
     resources:
         mem_mb = 1000,
-        walltime = '120:00'
+        walltime = '4:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join(breeds),file=fout)
+            #for i,result in enumerate([process_line(line) for line in fin]):
+            #    print(result,file=fout)
+
             with Pool(threads) as p:
                 for i, result in enumerate(p.imap_unordered(process_line, fin, 10)):
                     if i % 100 == 0:
