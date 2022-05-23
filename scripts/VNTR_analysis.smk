@@ -101,7 +101,7 @@ rule process_VNTRs:
     threads: 18
     resources:
         mem_mb = 1000,
-        walltime = '24:00'
+        walltime = '120:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join(breeds),file=fout)

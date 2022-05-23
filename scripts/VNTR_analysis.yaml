@@ -4,7 +4,7 @@ ARS_TR: '/cluster/work/pausch/alex/VNTR_rpgg/input/ARS.TR.nonrep.bed'
 low: 7
 
 TR_low: 10
-TR_high: 70
+TR_high: 100
 max_region_length: 10000
 missing_rate: 0.5
 TR_divergence_limit: 0.2
