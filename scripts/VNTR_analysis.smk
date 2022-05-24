@@ -101,7 +101,7 @@ def process_line(line):
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions)
 
-        if len(sequences)/len(breeds) > config.get('missing_rate',0):
+        if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             counts = count_VNTRs(sequences,TR)
             return ','.join(map(str,[chrom,start,end,TR] + [counts.get(b,math.nan) for b in breeds]))
     return
@@ -113,10 +113,10 @@ rule process_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 4
+    threads: 18
     resources:
-        mem_mb = 1000,
-        walltime = '4:00'
+        mem_mb = 500,
+        walltime = '120:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join(breeds),file=fout)
