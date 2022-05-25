@@ -56,11 +56,14 @@ from collections import defaultdict
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
     #could implement some sqrt approach, but then unequal meaning of divergence
-    counts = defaultdict(int)
+    counts = defaultdict(list)
     for asm, sequence in sequences.items():
-        counts[asm.split('_')[1].split(':')[0]] += len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True))
-
-    return dict(counts)
+        asm_ID = asm.split('_')[1].split(':')[0]
+        for hit in regex.finditer(f"(?eV1)({TR}){{e<={allowed_errors}}}",sequence,concurrent=True):
+            counts[asm_ID].append(sum(hit.fuzzy_counts))
+    
+    
+    return counts #{asm:np.var(fuzzy_counts) for asm,fuzzy_counts in counts.items()}
     #return {asm.split('_')[1].split(':')[0]: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True)) for asm, sequence in sequences.items()}
 
 def extract_fasta_regions(regions):
@@ -86,6 +89,9 @@ import math
 from multiprocessing import Pool
 
 import Levenshtein
+#statistics.variance throws an error if only 1 sample, so use numpy
+#from statistics import variance
+from numpy import var as variance
 
 def process_line(line):
     chrom, start, end, nodes, count, TR = line.rstrip().split()
@@ -103,9 +109,18 @@ def process_line(line):
 
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             counts = count_VNTRs(sequences,TR)
-            return ','.join(map(str,[chrom,start,end,TR] + [counts.get(b,math.nan) for b in breeds]))
+            stats = []
+            for B in breeds:
+                if B in counts:
+                    stats.extend([len(counts[B]),sum(counts[B]),f'{variance(counts[B]):.3f}'])
+                else:
+                    #hardcode to 3 values (len,sum,var)
+                    stats.extend([math.nan]*3)
+            return ','.join(map(str,[chrom,start,end,TR] + stats))
+        #V for b in breeds for V in (counts.get(b,math.nan)]))
     return
 
+from itertools import product
 rule process_VNTRs:
     input:
         VNTRs = 'putative_VNTRs.{rate}.bed',
@@ -113,17 +128,18 @@ rule process_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 4
+    threads: 18
     resources:
         mem_mb = 500,
-        walltime = '4:00'
+        walltime = '120:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
-            print('chr,start,end,TR,' + ','.join(breeds),file=fout)
+            print('chr,start,end,TR,' + ','.join('_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
             
             if config.get('debug',False):
                 for i,result in enumerate([process_line(line) for line in fin]):
-                    print(result,file=fout)
+                    if result:
+                        print(result,file=fout)
             else:
                 with Pool(threads) as p:
                     for i, result in enumerate(p.imap_unordered(process_line, fin, 50)):
