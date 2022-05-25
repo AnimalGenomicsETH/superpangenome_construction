@@ -113,34 +113,23 @@ rule process_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 18
+    threads: 4
     resources:
         mem_mb = 500,
-        walltime = '120:00'
+        walltime = '4:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join(breeds),file=fout)
-            #for i,result in enumerate([process_line(line) for line in fin]):
-            #    print(result,file=fout)
+            
+            if config.get('debug',False):
+                for i,result in enumerate([process_line(line) for line in fin]):
+                    print(result,file=fout)
+            else:
+                with Pool(threads) as p:
+                    for i, result in enumerate(p.imap_unordered(process_line, fin, 50)):
+                        if i % 100 == 0:
+                            print(f'done {i=} results',flush=True)
+                            fout.flush()
+                        if result:
+                            print(result,file=fout)
 
-            with Pool(threads) as p:
-                for i, result in enumerate(p.imap_unordered(process_line, fin, 10)):
-                    if i % 100 == 0:
-                        print(f'done {i=} results',flush=True)
-                        fout.flush()
-                    if result:
-                        print(result,file=fout)
-
-            #for line in fin:
-            #    chrom, start, end, nodes, count, TR = line.rstrip().split()
-            #    count = int(count)
-            #    if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high'):
-            #        source, *_, sink = nodes.split(',')
-            #        regions = subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
-            #        sequences = extract_fasta_regions(regions)
-
-            #        counts = count_VNTRs(sequences,TR)
-            #        if len(counts)/len(breeds) < config.get('missing_rate',0):
-            #            continue
-            #        counts_clean = {regex.match( r'.*?_(.*):.*',k).group(1):v for k,v in counts.items()}
-            #        print(','.join(map(str,[chrom,start,end,TR] + [counts_clean.get(b,math.nan) for b in breeds])),file=fout)
