@@ -4,12 +4,12 @@ fasta_path: '/cluster/work/pausch/danang/psd/scratch/assembly/'
 ARS_TR: '/cluster/work/pausch/alex/VNTR_rpgg/input/ARS.TR.nonrep.bed'
 
 #graph structure
-low: 7
-missing_rate: 0.5
+low: 3
+missing_rate: 1
 
 #TR filters
 TR_low: 10
-TR_high: 100
+TR_high: 60
 TR_divergence_limit: 0.2
 
 #fasta
