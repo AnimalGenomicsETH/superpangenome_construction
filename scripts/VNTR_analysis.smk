@@ -62,25 +62,22 @@ def count_VNTRs(sequences,TR):
         for hit in regex.finditer(f"(?eV1)({TR}){{e<={allowed_errors}}}",sequence,concurrent=True):
             counts[asm_ID].append(sum(hit.fuzzy_counts))
     
-    
-    return counts #{asm:np.var(fuzzy_counts) for asm,fuzzy_counts in counts.items()}
-    #return {asm.split('_')[1].split(':')[0]: len(regex.findall(f"({TR}){{e<={allowed_errors}}}",sequence,concurrent=True)) for asm, sequence in sequences.items()}
+    return counts
 
 def extract_fasta_regions(regions):
     sequences = {}
     for region in regions:
-        parts= region.rstrip().split()
-        name = parts[5]
+        name = region.rstrip().split()[5]
         if name == '.':
             continue
         ix,low,high = name.split(':')[3:6]
+        
+        if (int(high) - int(low)) > config.get('max_region_length',10000):
+            print(f'Skipping segment {ix}:{low}-{high} due to length exceeding config')
+            continue
         offset = config.get('flanks',100)
         ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
         
-        if (int(high) - int(low)) > config.get('max_region_length',10000):
-            print('TOO LONG SKIPPING',region)
-            continue
-
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ix}:{int(low)-offset}-{int(high)+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
@@ -117,7 +114,6 @@ def process_line(line):
                     #hardcode to 3 values (len,sum,var)
                     stats.extend([math.nan]*3)
             return ','.join(map(str,[chrom,start,end,TR] + stats))
-        #V for b in breeds for V in (counts.get(b,math.nan)]))
     return
 
 from itertools import product
