@@ -1,5 +1,6 @@
 breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak']
 
+#align asm to ref, then determine reversed orders
 #sort -k11,11nr angus_reverse.paf | grep -vE "(NKL|X|Y)" | head -n 200| sort -k6,6n | awk '{print $6,$5,$11}' | sort -k2,2h | awk '{seen[$1" "$2]+=$3} END { for (key in seen) { print key,seen[key] } }' |  sort -k1,1n -k3,3nr | awk '!orient[$1]{orient[$1]=$2} END { for (key in orient) { print key,orient[key] } }'
 inverted_chrs = {'Angus':['1', '2', '4', '7', '9', '13', '14', '18', '20', '23', '24', '29'], 'Brahman': ['4', '5', '7', '13', '15', '17', '18', '22', '25', '26', '29']}
 
@@ -35,6 +36,7 @@ rule gfatools_bubble:
         for i in {{0..28}}; do gfatools bubble ${{gfas[$i]}} | cut -f -3,12 | sed 's/_UCD//g'; done > {output}
         '''
 
+
 #bedtools merge -d 100 -c 4,5,6 -o distinct,sum,distinct -delim '|'  -i
 
 rule bedtools_intersect:
@@ -49,6 +51,18 @@ rule bedtools_intersect:
         '''
         #filters out duplicate lines where TRF can output multiple TRs
         bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} | awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' | awk '!seen[$1$2$3$4]++' > {output}
+        '''
+
+rule bedtools_merge:
+    input:
+        'putative_VNTRs.{rate}.bed'
+    output:
+        'putative_VNTRs.{rate}.merged.bed'
+    params:
+        dist = config.get('merging_distance',0)
+    shell:
+        '''
+        bedtools merge -d {params.dist} -c 4,5,6 -o distinct,sum,distinct -delim '|'  -i {input} > {output}
         '''
 
 import regex
@@ -100,7 +114,6 @@ def process_line(line):
         regions = []
         for node in nodes.split('|'):
             source, *_, sink = node.split(',')
-            #someway to handle multi-bubble
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions)
 
@@ -111,6 +124,7 @@ def process_line(line):
                 if B in counts:
                     stats.extend([len(counts[B]),sum(counts[B]),f'{variance(counts[B]):.3f}'])
                 else:
+                    #This occurs when there is a legitimate alignment and sequence for an asm, but no TRs were found
                     #hardcode to 3 values (len,sum,var)
                     stats.extend([math.nan]*3)
             return ','.join(map(str,[chrom,start,end,TR] + stats))
