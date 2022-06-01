@@ -5,16 +5,19 @@ import subprocess
 
 breed_list="UCD,Angus,Highland,OBV,Brahman,Yak,BSW,Pied,Gaur,Nellore,Simmental,Bison"
 breed_list=breed_list.split(",")
+# prog_list=["pggb","cactus"]
+prog_list=["cactus"]
 
 outgraph_dir="/cluster/scratch/cdanang/snarl_decomp"
 
 rule all:
     input:
-        expand("vnsplit/split_vntr_{chromo}.tsv",chromo=range(1,30)),
-        expand(outgraph_dir + "/pggb_graph/pggb_{chromo}.og",chromo=range(1,30)),
-        expand("vnsplit/vntr_coord_{chromo}_{breed}_pggb.tsv",chromo=range(1,3),breed=breed_list),
-        expand("vnsplit/vntr_comb_{chromo}.tsv",chromo=range(1,3)),
-        expand("vnsplit/{chromo}_vnseq_count.tsv",chromo=range(1,3))
+        # expand("vnsplit/split_vntr_{chromo}.tsv",chromo=range(1,30)),
+        # expand(outgraph_dir + "/{prog}_graph/{prog}_{chromo}.og",chromo=range(1,3),prog=prog_list),
+        # expand("vnsplit/vntr_coord_{chromo}_{breed}_{prog}.tsv",chromo=range(1,3),breed=breed_list,prog=prog_list),
+        # expand("vnsplit/vntr_comb_{chromo}_{prog}.tsv",chromo=range(1,3),prog=prog_list),
+        expand("vnsplit/{chromo}_{prog}_vnseq_count.tsv",chromo=range(1,30),prog=prog_list),
+        expand("vnsplit/comb_{prog}_vnseq_stat.tsv",prog=prog_list)
 
 rule split_vntr:
     input:"VNTRs.70.csv"
@@ -31,32 +34,46 @@ rule split_vntr:
         """
 
 
+def get_path(prog,chromo):
+    if prog == "pggb":
+        return f"/cluster/work/pausch/danang/psd/scratch/real_comp/graph/pggb_{chromo}/pggb_{chromo}.gfa"
+    if prog == "cactus":
+        return f"/cluster/work/pausch/danang/psd/scratch/real_comp/graph/cactus/cactus_simple_{chromo}.gfa"
+
 rule build_odgi:
-    input:"/cluster/work/pausch/danang/psd/scratch/real_comp/graph/pggb_{chromo}/pggb_{chromo}.gfa"
-    output:outgraph_dir + "/pggb_graph/pggb_{chromo}.og"
+    input:lambda wildcards: get_path(wildcards.prog,wildcards.chromo)
+    output:outgraph_dir + "/{prog}_graph/{prog}_{chromo}.og"
     threads: 10
     resources: 
         mem_mb= 2000,
         walltime= "04:00"
+    params: 
+        outgraph = outgraph_dir
     shell:
         """
-
-        odgi build -g {input} -o {output} -t {threads}
+        
+        if [[ {wildcards.prog} == "cactus"  ]]; then 
+            grfile={params.outgraph}/cactus_{wildcards.chromo}.gfa
+            awk '$1 !~ /P/{{ print;next}}{{ split($2,arr,".");$2=arr[2];print $0}}' OFS="\\t" {input} > $grfile
+            odgi build -g $grfile -o {output} -t {threads}            
+        else
+            odgi build -g {input} -o {output} -t {threads}
+        fi 
 
         """
 
 rule liftover_coordinate:
     input:
-        chromo=outgraph_dir + "/pggb_graph/pggb_{chromo}.og",
+        chromo=outgraph_dir + "/{prog}_graph/{prog}_{chromo}.og",
         vntr="vnsplit/split_vntr_{chromo}.tsv"
-    output:"vnsplit/vntr_coord_{chromo}_{breed}_pggb.tsv"
+    output:"vnsplit/vntr_coord_{chromo}_{breed}_{prog}.tsv"
     threads: 20
     resources:
         mem_mb= 2000,
         walltime= "04:00"
     shell:
         """
-
+        
         odgi position -i {input.chromo} -b {input.vntr} -r {wildcards.chromo}_{wildcards.breed} -I > {output}
 
 
@@ -65,9 +82,9 @@ rule liftover_coordinate:
 
 rule concat_info:
     input:
-        expand("vnsplit/vntr_coord_{{chromo}}_{breed}_pggb.tsv",breed=breed_list)
+        expand("vnsplit/vntr_coord_{{chromo}}_{breed}_{{prog}}.tsv",breed=breed_list)
     output:
-        "vnsplit/vntr_comb_{chromo}.tsv"
+        "vnsplit/vntr_comb_{chromo}_{prog}.tsv"
     threads: 5
     resources:
         mem_mb= 1000,
@@ -104,13 +121,17 @@ def extract_fasta_region(line):
         token=comp.split(",")
         if len(token) > 2:
             chromo,breed,start,stop,strand=comp.split(",")
-            start, stop=int(start), int(stop)
+            #start, stop=int(start), int(stop)
             if strand == "+":
-                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{start-offset}-{stop+offset} | seqtk2 seq -l 0",
+                start = int(start) - offset
+                stop = int(stop) + offset
+                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{start}-{stop} | seqtk2 seq -l 0",
                         shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1].upper()
                 sequence[breed] = seqfa
             elif strand == "-":
-                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{stop-offset}-{start+offset} | seqtk2 seq -l 0 -r",
+                stop = int(stop) - offset
+                start = int(start) + offset
+                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{stop}-{start} | seqtk2 seq -l 0 -r",
                                     shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1].upper()
                 sequence[breed] = seqfa
         else:
@@ -167,10 +188,10 @@ from itertools import product
 rule detect_pattern:
     input:
         vntrfile="VNTRs.70.csv",
-        regfile="vnsplit/vntr_comb_{chromo}.tsv",
+        regfile="vnsplit/vntr_comb_{chromo}_{prog}.tsv",
         fastafile= expand(fastadir + "/{{chromo}}/{breed}_{{chromo}}.fa",breed=breed_list)
     output:
-        "vnsplit/{chromo}_vnseq_count.tsv"
+        "vnsplit/{chromo}_{prog}_vnseq_count.tsv"
     threads: 20
     resources:
         mem_mb= 1000,
@@ -181,4 +202,28 @@ rule detect_pattern:
             print("vnid," + ','.join('_'.join(P) for P in product(breed_list,['count','sum','var'])),file=outfile)
             with Pool(18) as p:
                 for result in p.imap_unordered(processs_line,infile,18):
-                    print(result,file=outfile)
+                    print(result,file=outfile,flush=True)
+
+
+
+rule combine_vntr_info:
+    input:
+        expand("vnsplit/{chromo}_{{prog}}_vnseq_count.tsv",chromo=range(1,30))
+    output:
+        "vnsplit/comb_{prog}_vnseq_stat.tsv"
+    threads: 2
+    resources:
+        mem_mb= 1000,
+        walltime= "01:00"
+    shell:
+        """
+
+        head -n1 {input[0]} >> {output}
+
+        for infile in {input}
+        do
+            tail +2 $infile >> {output}
+        done
+
+        """
+
