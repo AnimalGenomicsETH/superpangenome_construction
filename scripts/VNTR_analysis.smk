@@ -80,19 +80,30 @@ def count_VNTRs(sequences,TR):
 
 def extract_fasta_regions(regions):
     sequences = {}
+    region_per_asm = {}
     for region in regions:
         name = region.rstrip().split()[5]
         if name == '.':
             continue
         ix,low,high = name.split(':')[3:6]
-        
-        if (int(high) - int(low)) > config.get('max_region_length',10000):
+        ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
+        low, high = int(low), int(high)
+
+        if (ch,asm) in region_per_asm:
+            if low < region_per_asm[(ch,asm)][0]:
+                region_per_asm[(ch,asm)][0] = low
+            if high > region_per_asm[(ch,asm)][1]:
+                region_per_asm[(ch,asm)][1] = high
+        else:
+            region_per_asm[(ch,asm)] = [low,high]
+
+    for (ch,asm),(low,high) in region_per_asm.items():
+        if (high - low) > config.get('max_region_length',10000):
             print(f'Skipping segment {ix}:{low}-{high} due to length exceeding config')
             continue
+
         offset = config.get('flanks',100)
-        ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
-        
-        header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ix}:{int(low)-offset}-{int(high)+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+        header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
 
@@ -116,7 +127,6 @@ def process_line(line):
             source, *_, sink = node.split(',')
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions)
-
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             counts = count_VNTRs(sequences,TR)
             stats = []
@@ -141,7 +151,7 @@ rule process_VNTRs:
     threads: 18
     resources:
         mem_mb = 500,
-        walltime = '120:00'
+        walltime = '24:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,' + ','.join('_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
@@ -158,4 +168,3 @@ rule process_VNTRs:
                             fout.flush()
                         if result:
                             print(result,file=fout)
-
