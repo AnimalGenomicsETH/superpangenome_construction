@@ -2,7 +2,7 @@ breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OB
 
 #align asm to ref, then determine reversed orders
 #sort -k11,11nr angus_reverse.paf | grep -vE "(NKL|X|Y)" | head -n 200| sort -k6,6n | awk '{print $6,$5,$11}' | sort -k2,2h | awk '{seen[$1" "$2]+=$3} END { for (key in seen) { print key,seen[key] } }' |  sort -k1,1n -k3,3nr | awk '!orient[$1]{orient[$1]=$2} END { for (key in orient) { print key,orient[key] } }'
-inverted_chrs = {'Angus':['1', '2', '4', '7', '9', '13', '14', '18', '20', '23', '24', '29'], 'Brahman': ['4', '5', '7', '13', '15', '17', '18', '22', '25', '26', '29']}
+inverted_chrs = {'Angus':['1', '2', '4', '7', '9', '13', '14', '18', '20', '23', '24', '29'], 'Brahman': ['4', '5', '7', '1', '15', '17', '18', '22', '25', '26', '29']}
 
 rule all:
     input:
@@ -10,7 +10,8 @@ rule all:
 
 wildcard_constraints:
     chr = r'\d*',
-    asm = r'|'.join(breeds)
+    asm = r'|'.join(breeds),
+    rate = r'\d+'
 
 rule minigraph_call:
     input:
@@ -50,7 +51,9 @@ rule bedtools_intersect:
     shell:
         '''
         #filters out duplicate lines where TRF can output multiple TRs
-        bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} | awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' | awk '!seen[$1$2$3$4]++' > {output}
+        bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} |\
+        awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' > {output}
+        #awk '!seen[$1$2$3$4]++' > {output}
         '''
 
 rule bedtools_merge:
@@ -103,6 +106,8 @@ def extract_fasta_regions(regions):
             continue
 
         offset = config.get('flanks',100)
+        #header, sequence = (asm,'atgc') 
+        #TEMP LINE
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
@@ -128,6 +133,8 @@ def process_line(line):
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions)
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
+            #TEMP LINE
+            #return len(sequences)
             counts = count_VNTRs(sequences,TR)
             stats = []
             for B in breeds:
@@ -143,7 +150,7 @@ def process_line(line):
 from itertools import product
 rule process_VNTRs:
     input:
-        VNTRs = 'putative_VNTRs.{rate}.bed',
+        VNTRs = 'putative_VNTRs.{rate}.merged.bed',
         beds = expand('{chr}/{asm}.bed',chr=range(1,30),asm=breeds),
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
@@ -157,7 +164,8 @@ rule process_VNTRs:
             print('chr,start,end,TR,' + ','.join('_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
             
             if config.get('debug',False):
-                for i,result in enumerate([process_line(line) for line in fin]):
+                for i,line in enumerate(fin):
+                    result = process_line(line)
                     if result:
                         print(result,file=fout)
             else:

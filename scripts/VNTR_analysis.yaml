@@ -1,17 +1,21 @@
 #paths
 gfa_path: '/cluster/work/pausch/to_share/sv_analysis/new_minigraph/'
 fasta_path: '/cluster/work/pausch/danang/psd/scratch/assembly/'
-ARS_TR: '/cluster/work/pausch/alex/VNTR_rpgg/input/ARS.TR.nonrep.bed'
+ARS_TR: '/cluster/work/pausch/alex/GFA_VNTRs/TR/d0_m100.L100.bed'
+merging_distance: 250
 
 #graph structure
-low: 3
+low: 2
 missing_rate: 1
 
 #TR filters
 TR_low: 10
-TR_high: 60
+TR_high: 75
 TR_divergence_limit: 0.2
 
 #fasta
 flanks: 500
 max_region_length: 10000
+
+reference: '/cluster/work/pausch/inputs/ref/BTA/UCD1.2/ARS-UCD1.2_Btau5.0.1Y.fa'
+repeats: '/cluster/work/pausch/alex/VNTR_rpgg/ARS.repeats.sorted.bed'
