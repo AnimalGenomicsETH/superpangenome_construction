@@ -2,19 +2,22 @@
 gfa_path: '/cluster/work/pausch/to_share/sv_analysis/new_minigraph/'
 fasta_path: '/cluster/work/pausch/danang/psd/scratch/assembly/'
 ARS_TR: '/cluster/work/pausch/alex/GFA_VNTRs/TR/d0_m100.L100.bed'
+#ARS_TR: '/cluster/work/pausch/alex/GFA_VNTRs/TR/SPACA7.bed'
 merging_distance: 250
 
 #graph structure
 low: 2
-missing_rate: 1
+missing_rate: 0
 
 #TR filters
 TR_low: 10
-TR_high: 75
+TR_high: 100
 TR_divergence_limit: 0.2
+scaling: 'log'
 
 #fasta
-flanks: 500
+flanking_region: 500
+flank_factor: 5
 max_region_length: 10000
 
 reference: '/cluster/work/pausch/inputs/ref/BTA/UCD1.2/ARS-UCD1.2_Btau5.0.1Y.fa'

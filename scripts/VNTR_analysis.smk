@@ -71,7 +71,7 @@ rule bedtools_merge:
 import regex
 from collections import defaultdict
 def count_VNTRs(sequences,TR):
-    allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
+    allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0)) if config.get('scaling','linear') != 'log' else math.floor(math.sqrt(len(TR)))
     #could implement some sqrt approach, but then unequal meaning of divergence
     counts = defaultdict(list)
     for asm, sequence in sequences.items():
@@ -81,7 +81,7 @@ def count_VNTRs(sequences,TR):
     
     return counts
 
-def extract_fasta_regions(regions):
+def extract_fasta_regions(regions,TR_length):
     sequences = {}
     region_per_asm = {}
     for region in regions:
@@ -105,7 +105,8 @@ def extract_fasta_regions(regions):
             print(f'Skipping segment {ix}:{low}-{high} due to length exceeding config')
             continue
 
-        offset = config.get('flanks',100)
+        offset = config.get('flank_factor',0)*TR_length
+        #offset = config.get('flanking_region',0)
         #header, sequence = (asm,'atgc') 
         #TEMP LINE
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
@@ -131,7 +132,7 @@ def process_line(line):
         for node in nodes.split('|'):
             source, *_, sink = node.split(',')
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
-        sequences = extract_fasta_regions(regions)
+        sequences = extract_fasta_regions(regions,len(TR))
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             #TEMP LINE
             #return len(sequences)
@@ -155,7 +156,7 @@ rule process_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 18
+    threads: 12
     resources:
         mem_mb = 500,
         walltime = '24:00'
