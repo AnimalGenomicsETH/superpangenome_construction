@@ -27,12 +27,14 @@ for input_file in sys.argv[3:]:
                 if not missing:
                     valid+=1 
                 if vnseq[token[0]] >= 10 and vnseq[token[0]] <= 100:
+                    print(token[0])
                     lenlim+=1
 
 
 
-print(valid)
-print(lenlim)
+
+#print(valid)
+#print(lenlim)
 #print(vnid)
 
 
