@@ -72,12 +72,17 @@ import regex
 from collections import defaultdict
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0)) if config.get('scaling','linear') != 'log' else math.floor(math.sqrt(len(TR)))
-    #could implement some sqrt approach, but then unequal meaning of divergence
-    counts = defaultdict(list)
+    counts = dict()
+    # defaultdict(list)
     for asm, sequence in sequences.items():
         asm_ID = asm.split('_')[1].split(':')[0]
-        for hit in regex.finditer(f"(?eV1)({TR}){{e<={allowed_errors}}}",sequence,concurrent=True):
-            counts[asm_ID].append(sum(hit.fuzzy_counts))
+        try:
+            counts[asm_ID] = len(regex.findall(f"(?bV1)({TR}){{2i+2d+1s<={allowed_errors}}}",sequence,concurrent=True,timeout=config.get('timeout',0)))
+        except TimeoutError:
+            print('HIT AN ERROR')
+            counts[asm_ID] = -1
+        #for hit in regex.finditer(f"(?eV1)({TR}){{e<={allowed_errors}}}",sequence,concurrent=True):
+        #    counts[asm_ID].append(sum(hit.fuzzy_counts))
     
     return counts
 
@@ -104,9 +109,13 @@ def extract_fasta_regions(regions,TR_length):
         if (high - low) > config.get('max_region_length',10000):
             print(f'Skipping segment {ix}:{low}-{high} due to length exceeding config')
             continue
-
-        offset = config.get('flank_factor',0)*TR_length
-        #offset = config.get('flanking_region',0)
+        
+        if 'flanking_region' in config:
+            offset = config['flanking_region']
+        elif 'flank_factor' in config:
+            offset = config['flank_factor']*TR_length
+        else:
+            offset = 0
         #header, sequence = (asm,'atgc') 
         #TEMP LINE
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
@@ -133,19 +142,21 @@ def process_line(line):
             source, *_, sink = node.split(',')
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions,len(TR))
+        print(line)
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             #TEMP LINE
-            #return len(sequences)
             counts = count_VNTRs(sequences,TR)
             stats = []
             for B in breeds:
                 if B in counts:
-                    stats.extend([len(counts[B]),sum(counts[B]),f'{variance(counts[B]):.3f}'])
+                    stats.append(counts[B])
+                    #stats.extend([len(counts[B]),sum(counts[B]),f'{variance(counts[B]):.3f}'])
                 else:
                     #This occurs when there is a legitimate alignment and sequence for an asm, but no TRs were found
                     #hardcode to 3 values (len,sum,var)
-                    stats.extend([math.nan]*3)
-            return ','.join(map(str,[chrom,start,end,TR] + stats))
+                    stats.append(math.nan)
+                    #stats.extend([math.nan]*3)
+            return ','.join(map(str,[chrom,start,end,TR,len(sequences)] + stats))
     return
 
 from itertools import product
@@ -162,7 +173,7 @@ rule process_VNTRs:
         walltime = '24:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
-            print('chr,start,end,TR,' + ','.join('_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
+            print('chr,start,end,TR,alignments,' + ','.join(breeds),file=fout)#'_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
             
             if config.get('debug',False):
                 for i,line in enumerate(fin):
