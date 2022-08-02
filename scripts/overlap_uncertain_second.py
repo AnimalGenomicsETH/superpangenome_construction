@@ -18,15 +18,12 @@ in2=open(second_file,"r")
 
 max_pos=0
 
-while in1.readline()[0] == "#":
-    in1.readline()
-
-while in2.readline()[0] == "#":
-    in2.readline()
+in1.readline()
+in2.readline()
 
 first_comp=in1.readline().strip().split()
 second_comp=in2.readline().strip().split()
-first_coord=int(first_comp[1])
+first_coord=int(first_comp[0])
 second_coord=int(second_comp[1])
 coord_sel=first_coord
 comb_coord=[]
@@ -39,16 +36,17 @@ while True:
             #print([first_comp,second_comp])
             if coord_sel == first_coord:
                 #comb_coord.append(second_coord)
-                comb_coord.extend([first_coord,first_graph])
+                #comb_coord.extend([second_coord])
+                comb_coord.extend([second_coord])
             else:
                 print(*comb_coord)
                 coord_sel = first_coord
-                comb_coord=[first_coord,first_graph,second_coord,second_graph]
+                comb_coord=[first_comp,second_coord,second_graph]
             #print(first_coord,second_coord)
 
         try:
             first_comp =  in1.readline().strip().split()
-            first_coord = int(first_comp[1])
+            first_coord = int(first_comp[0])
         except:
             break
     
@@ -59,11 +57,11 @@ while True:
             #print([first_comp,second_comp])
             #print(first_coord,second_coord)
             if coord_sel == first_coord:
-                comb_coord.extend([second_coord,second_graph])
+                comb_coord.extend([second_coord])
             else:
-                print(*comb_coord)
+                print(*comb_coord,comb_coord)
                 coord_sel = first_coord
-                comb_coord=[first_coord,first_graph,second_coord,second_graph]
+                comb_coord=[first_comp,second_coord,second_graph]
 
         try:
             second_comp = in2.readline().strip().split()
