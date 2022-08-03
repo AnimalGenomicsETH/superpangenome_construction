@@ -12,13 +12,14 @@ missing_rate: 0
 #TR filters
 TR_low: 10
 TR_high: 100
-TR_divergence_limit: 0.2
-scaling: 'log'
+TR_divergence_limit: 0.20
+scaling: 'linear'
+timeout: 30
 
 #fasta
-flanking_region: 500
-flank_factor: 5
-max_region_length: 10000
+#flanking_region: 500
+flank_factor: 10
+max_region_length: 25000
 
 reference: '/cluster/work/pausch/inputs/ref/BTA/UCD1.2/ARS-UCD1.2_Btau5.0.1Y.fa'
 repeats: '/cluster/work/pausch/alex/VNTR_rpgg/ARS.repeats.sorted.bed'
