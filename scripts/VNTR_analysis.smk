@@ -2,7 +2,7 @@ breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OB
 
 #align asm to ref, then determine reversed orders
 #sort -k11,11nr angus_reverse.paf | grep -vE "(NKL|X|Y)" | head -n 200| sort -k6,6n | awk '{print $6,$5,$11}' | sort -k2,2h | awk '{seen[$1" "$2]+=$3} END { for (key in seen) { print key,seen[key] } }' |  sort -k1,1n -k3,3nr | awk '!orient[$1]{orient[$1]=$2} END { for (key in orient) { print key,orient[key] } }'
-inverted_chrs = {'Angus':['1', '2', '4', '7', '9', '13', '14', '18', '20', '23', '24', '29'], 'Brahman': ['4', '5', '7', '1', '15', '17', '18', '22', '25', '26', '29']}
+inverted_chrs = {'Angus':['1', '2', '4', '7', '9', '13', '14', '18', '20', '23', '24', '29'], 'Brahman': ['4', '5', '7', '13', '15', '17', '18', '22', '25', '26', '29']}
 
 rule all:
     input:
@@ -50,10 +50,8 @@ rule bedtools_intersect:
         threshold = lambda wildcards: int(wildcards.rate)/100
     shell:
         '''
-        #filters out duplicate lines where TRF can output multiple TRs
         bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} |\
         awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' > {output}
-        #awk '!seen[$1$2$3$4]++' > {output}
         '''
 
 rule bedtools_merge:
@@ -73,17 +71,14 @@ from collections import defaultdict
 def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0)) if config.get('scaling','linear') != 'log' else math.floor(math.sqrt(len(TR)))
     counts = dict()
-    # defaultdict(list)
     for asm, sequence in sequences.items():
         asm_ID = asm.split('_')[1].split(':')[0]
+        if len(sequence) > config.get('max_region_length',10000):
+            counts[asm_ID] = -2
         try:
-            counts[asm_ID] = len(regex.findall(f"(?bV1)({TR}){{2i+2d+1s<={allowed_errors}}}",sequence,concurrent=True,timeout=config.get('timeout',0)))
+            counts[asm_ID] = len(regex.findall(f"(?eV1)({TR}){{2i+2d+1s<={allowed_errors}}}",sequence,concurrent=True,timeout=config.get('timeout',60)))
         except TimeoutError:
-            print('HIT AN ERROR')
             counts[asm_ID] = -1
-        #for hit in regex.finditer(f"(?eV1)({TR}){{e<={allowed_errors}}}",sequence,concurrent=True):
-        #    counts[asm_ID].append(sum(hit.fuzzy_counts))
-    
     return counts
 
 def extract_fasta_regions(regions,TR_length):
@@ -106,18 +101,14 @@ def extract_fasta_regions(regions,TR_length):
             region_per_asm[(ch,asm)] = [low,high]
 
     for (ch,asm),(low,high) in region_per_asm.items():
-        if (high - low) > config.get('max_region_length',10000):
-            print(f'Skipping segment {ix}:{low}-{high} due to length exceeding config')
-            continue
-        
         if 'flanking_region' in config:
             offset = config['flanking_region']
         elif 'flank_factor' in config:
             offset = config['flank_factor']*TR_length
         else:
             offset = 0
-        #header, sequence = (asm,'atgc') 
-        #TEMP LINE
+        if 'Brahman' not in asm:
+            continue
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
@@ -133,16 +124,15 @@ from numpy import var as variance
 def process_line(line):
     chrom, start, end, nodes, count, TR = line.rstrip().split()
     count = int(count)
+    if '|' in TR:
+        TR = Levenshtein.median(TR.split('|'))
     if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
-        if '|' in TR:
-            TR = Levenshtein.median(TR.split('|'))
 
         regions = []
         for node in nodes.split('|'):
             source, *_, sink = node.split(',')
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
         sequences = extract_fasta_regions(regions,len(TR))
-        print(line)
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):
             #TEMP LINE
             counts = count_VNTRs(sequences,TR)
@@ -150,12 +140,9 @@ def process_line(line):
             for B in breeds:
                 if B in counts:
                     stats.append(counts[B])
-                    #stats.extend([len(counts[B]),sum(counts[B]),f'{variance(counts[B]):.3f}'])
                 else:
-                    #This occurs when there is a legitimate alignment and sequence for an asm, but no TRs were found
-                    #hardcode to 3 values (len,sum,var)
+                    #indicates an "." genotype for a path, so poor alignment
                     stats.append(math.nan)
-                    #stats.extend([math.nan]*3)
             return ','.join(map(str,[chrom,start,end,TR,len(sequences)] + stats))
     return
 
