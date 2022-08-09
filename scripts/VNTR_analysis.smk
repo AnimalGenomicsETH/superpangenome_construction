@@ -72,7 +72,7 @@ def count_VNTRs(sequences,TR):
     allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0)) if config.get('scaling','linear') != 'log' else math.floor(math.sqrt(len(TR)))
     counts = dict()
     for asm, sequence in sequences.items():
-        asm_ID = asm.split('_')[1].split(':')[0]
+        asm_ID = asm.split('_')[1].split(':')[0] if '_' in asm else asm
         if len(sequence) > config.get('max_region_length',10000):
             counts[asm_ID] = -2
         try:
@@ -81,7 +81,16 @@ def count_VNTRs(sequences,TR):
             counts[asm_ID] = -1
     return counts
 
-def extract_fasta_regions(regions,TR_length):
+def get_flank_size(TR_length):
+    if 'flanking_region' in config:
+        offset = config['flanking_region']
+    elif 'flank_factor' in config:
+        offset = config['flank_factor']*TR_length
+    else:
+        offset = 0
+    return offset
+
+def extract_fasta_regions_M(regions,TR_length):
     sequences = {}
     region_per_asm = {}
     for region in regions:
@@ -101,27 +110,52 @@ def extract_fasta_regions(regions,TR_length):
             region_per_asm[(ch,asm)] = [low,high]
 
     for (ch,asm),(low,high) in region_per_asm.items():
-        if 'flanking_region' in config:
-            offset = config['flanking_region']
-        elif 'flank_factor' in config:
-            offset = config['flank_factor']*TR_length
-        else:
-            offset = 0
-        if 'Brahman' not in asm:
-            continue
+        offset = get_flank_size(TR_length)
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
 
+def extract_fasta_region_PC(line,TR_length):
+    sequence={}
+    offset = get_flank_size(TR_length)
+    fastadir="/cluster/work/pausch/danang/psd/scratch/assembly"
+    for comp in line:
+        token=comp.split(",")
+        if len(token) > 2:
+            chromo,breed,start,stop,strand=comp.split(",")
+            if strand == "+":
+                start = int(start) - offset
+                stop = int(stop) + offset
+                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{start}-{stop} | seqtk seq -U -l 0",
+                        shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1].upper()
+                sequence[breed] = seqfa
+            elif strand == "-":
+                stop = int(stop) - offset
+                start = int(start) + offset
+                seqfa=subprocess.run(f"samtools faidx {fastadir}/{chromo}/{breed}_{chromo}.fa {chromo}_{breed}:{stop}-{start} | seqtk seq -U -l 0 -r",
+                                    shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1].upper()
+                sequence[breed] = seqfa
+    return sequence
+
+
 import math
 from multiprocessing import Pool
 
-import Levenshtein
+#import Levenshtein
 #statistics.variance throws an error if only 1 sample, so use numpy
 #from statistics import variance
 from numpy import var as variance
+def postprocess_line(chrom,start,end,TR,sequences,counts):
+    stats = []
+    for B in breeds:
+        if B in counts:
+            stats.append(counts[B])
+        else:
+            stats.append(math.nan)
+    return ','.join(map(str,[chrom,start,end,TR,len(sequences)] + stats))
 
-def process_line(line):
+
+def process_line_M(line):
     chrom, start, end, nodes, count, TR = line.rstrip().split()
     count = int(count)
     if '|' in TR:
@@ -132,32 +166,34 @@ def process_line(line):
         for node in nodes.split('|'):
             source, *_, sink = node.split(',')
             regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
-        sequences = extract_fasta_regions(regions,len(TR))
-        if len(sequences)/len(breeds) >= config.get('missing_rate',0):
+        sequences = extract_fasta_regions_M(regions,len(TR))
+        if len(sequences)/len(breeds) >= config.get('missing_rate',0):    
             #TEMP LINE
             counts = count_VNTRs(sequences,TR)
-            stats = []
-            for B in breeds:
-                if B in counts:
-                    stats.append(counts[B])
-                else:
-                    #indicates an "." genotype for a path, so poor alignment
-                    stats.append(math.nan)
-            return ','.join(map(str,[chrom,start,end,TR,len(sequences)] + stats))
+            return postprocess_line(chrom,start,end,TR,sequences,counts)
+    return
+
+def process_line_PC(line):
+    chrom, start, end, TR, *regions = line.rstrip().split()
+    if config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
+        sequences = extract_fasta_region_PC(regions,len(TR))
+
+        counts = count_VNTRs(sequences,TR)
+        return postprocess_line(chrom,start,end,TR,sequences,counts)
     return
 
 from itertools import product
-rule process_VNTRs:
+rule process_M_VNTRs:
     input:
         VNTRs = 'putative_VNTRs.{rate}.merged.bed',
         beds = expand('{chr}/{asm}.bed',chr=range(1,30),asm=breeds),
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 12
+    threads: 4
     resources:
         mem_mb = 500,
-        walltime = '24:00'
+        walltime = '4:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR,alignments,' + ','.join(breeds),file=fout)#'_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
@@ -170,6 +206,29 @@ rule process_VNTRs:
             else:
                 with Pool(threads) as p:
                     for i, result in enumerate(p.imap_unordered(process_line, fin, 50)):
+                        if i % 100 == 0:
+                            print(f'done {i=} results',flush=True)
+                            fout.flush()
+                        if result:
+                            print(result,file=fout)
+
+rule process_regions_PC:
+    input:
+        regions = 'TR_tsvs/pggb.{chr}.tsv'
+    output:
+        'TR_tsvs/pggb.{chr}.count'
+    threads: 18
+    resources:
+        mem_mb = 250,
+        walltime = "24:00"
+    run:
+        with open(input.regions,'r') as fin, open(output[0],'w') as fout:
+            print('chr,start,end,TR,alignments,' + ','.join(breeds),file=fout)
+            if config.get('debug',False):
+                pass
+            else:
+                with Pool(threads) as p:
+                    for i, result in enumerate(p.imap_unordered(process_line_PC, fin, 50)):
                         if i % 100 == 0:
                             print(f'done {i=} results',flush=True)
                             fout.flush()
