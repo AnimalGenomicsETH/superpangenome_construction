@@ -1,7 +1,7 @@
 rule all:
     input:
         #expand('graph_{c}.L{L}.wave.SV.vcf.gz',c=range(1,30),L=(2,5,10,30,50)),
-        expand('jasmine.{chr}.vcf',chr=range(1,30))
+        expand('jasmine.{chr}.seq0.dist100.vcf',chr=range(1,30))
 
 rule vg_deconstruct:
     input:
@@ -29,12 +29,15 @@ rule vg_deconstruct:
 
 rule jasmine_intersect:
     input:
-        expand('graph_{{chr}}.L{L}.wave.SV.vcf',L=(2,5,10,30,50))
+        expand('graph_{{chr}}.L{L}.wave.SV.vcf',L=(2,5,10,30,50)),
+        'assembly_{chr}.wave.SV.vcf'
     output:
-        vcf = 'jasmine.{chr}.vcf',
+        vcf = 'jasmine.{chr}.seq{S}.dist{D}.vcf',
         #_count = 'jasmine.{chr}.count'
     params:
-        _input = lambda wildcards, input: ','.join(input)
+        _input = lambda wildcards, input: ','.join(input),
+        seqID = lambda wildcards: int(wildcards.S)/100,
+        maxD = lambda wildcards: int(wildcards.D)/100
     threads: 4
     resources:
         mem_mb = 2000,
@@ -43,6 +46,6 @@ rule jasmine_intersect:
         'jasmine'
     shell:
         '''
-        jasmine --comma_filelist file_list={params._input},/cluster/work/pausch/to_share/sv_analysis/snarl/merged_assembly/vcf_split/{wildcards.chr}_assembly_norm.vcf threads={threads} out_file={output.vcf} out_dir=$TMPDIR genome_file=/cluster/work/pausch/danang/psd/scratch/assembly/{wildcards.chr}/UCD_{wildcards.chr}.fa min_seq_id=.5 --pre_normalize --ignore_strand --allow_intrasample --normalize_type
+        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output.vcf} out_dir=$TMPDIR genome_file=/cluster/work/pausch/danang/psd/scratch/assembly/{wildcards.chr}/UCD_{wildcards.chr}.fa min_seq_id={params.seqID} max_dist_linear={params.maxD} max_dist=250 --dup_to_ins --pre_normalize --ignore_strand --allow_intrasample --normalize_type
         '''
 #grep -vE "SVTYPE=(INV|TRA)" {output.vcf} | grep -oP "(SVLEN=-?\d*|SUPP_VEC=\d{2})" | sed 's/[A-Z,=,_]*//g'  | paste -s -d' \n' > {output._count}

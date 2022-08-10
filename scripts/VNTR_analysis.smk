@@ -214,10 +214,10 @@ rule process_M_VNTRs:
 
 rule process_regions_PC:
     input:
-        regions = 'TR_tsvs/pggb.{chr}.tsv'
+        regions = 'TR_tsvs/{pangenome}.{chr}.tsv'
     output:
-        'TR_tsvs/pggb.{chr}.count'
-    threads: 18
+        'TR_tsvs/{pangenome}.{chr}.count'
+    threads: 8
     resources:
         mem_mb = 250,
         walltime = "24:00"
