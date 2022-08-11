@@ -174,12 +174,15 @@ def process_line_M(line):
     return
 
 def process_line_PC(line):
-    chrom, start, end, TR, *regions = line.rstrip().split()
-    if config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
-        sequences = extract_fasta_region_PC(regions,len(TR))
+    try:
+        chrom, start, end, TR, *regions = line.rstrip().split()
+        if config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
+            sequences = extract_fasta_region_PC(regions,len(TR))
 
-        counts = count_VNTRs(sequences,TR)
-        return postprocess_line(chrom,start,end,TR,sequences,counts)
+            counts = count_VNTRs(sequences,TR)
+            return postprocess_line(chrom,start,end,TR,sequences,counts)
+    except:
+        pass
     return
 
 from itertools import product
