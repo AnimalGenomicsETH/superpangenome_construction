@@ -47,11 +47,11 @@ rule bedtools_intersect:
     output:
         'putative_VNTRs.{rate}.bed'
     params:
-        threshold = lambda wildcards: int(wildcards.rate)/100
+        threshold = 0.000000001 #lambda wildcards: int(wildcards.rate)/100
     shell:
         '''
         bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} |\
-        awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$4"\\t"n"\\t"$8}}' > {output}
+        awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$6"\\t"$7"\\t"$4"\\t"n"\\t"$8}}' > {output}
         '''
 
 rule bedtools_merge:
@@ -63,7 +63,7 @@ rule bedtools_merge:
         dist = config.get('merging_distance',0)
     shell:
         '''
-        bedtools merge -d {params.dist} -c 4,5,6 -o distinct,sum,distinct -delim '|'  -i {input} > {output}
+        bedtools merge -d {params.dist} -c 4,5,6,7,8 -o min,max,distinct,sum,distinct -delim '|'  -i {input} > {output}
         '''
 
 import regex
@@ -73,12 +73,13 @@ def count_VNTRs(sequences,TR):
     counts = dict()
     for asm, sequence in sequences.items():
         asm_ID = asm.split('_')[1].split(':')[0] if '_' in asm else asm
-        if len(sequence) > config.get('max_region_length',10000):
+        if len(sequence) > config.get('max_region_length',100000):
             counts[asm_ID] = -2
         try:
             counts[asm_ID] = len(regex.findall(f"(?eV1)({TR}){{2i+2d+1s<={allowed_errors}}}",sequence,concurrent=True,timeout=config.get('timeout',60)))
         except TimeoutError:
             counts[asm_ID] = -1
+            break
     return counts
 
 def get_flank_size(TR_length):
@@ -141,22 +142,19 @@ def extract_fasta_region_PC(line,TR_length):
 import math
 from multiprocessing import Pool
 
-#import Levenshtein
+import Levenshtein
 #statistics.variance throws an error if only 1 sample, so use numpy
 #from statistics import variance
 from numpy import var as variance
-def postprocess_line(chrom,start,end,TR,sequences,counts):
+def postprocess_line(chrom,start,end,TR_start,TR_end,TR,sequences,counts):
     stats = []
     for B in breeds:
-        if B in counts:
-            stats.append(counts[B])
-        else:
-            stats.append(math.nan)
-    return ','.join(map(str,[chrom,start,end,TR,len(sequences)] + stats))
+        stats.append(counts.get(B,math.nan))
+    return ','.join(map(str,[chrom,start,end,TR_start,TR_end,TR,len(sequences)] + stats))
 
 
 def process_line_M(line):
-    chrom, start, end, nodes, count, TR = line.rstrip().split()
+    chrom, start, end, TR_start, TR_end, nodes, count, TR = line.rstrip().split()
     count = int(count)
     if '|' in TR:
         TR = Levenshtein.median(TR.split('|'))
@@ -170,7 +168,7 @@ def process_line_M(line):
         if len(sequences)/len(breeds) >= config.get('missing_rate',0):    
             #TEMP LINE
             counts = count_VNTRs(sequences,TR)
-            return postprocess_line(chrom,start,end,TR,sequences,counts)
+            return postprocess_line(chrom,start,end,TR_start,TR_end,TR,sequences,counts)
     return
 
 def process_line_PC(line):
@@ -180,7 +178,7 @@ def process_line_PC(line):
             sequences = extract_fasta_region_PC(regions,len(TR))
 
             counts = count_VNTRs(sequences,TR)
-            return postprocess_line(chrom,start,end,TR,sequences,counts)
+            return postprocess_line(chrom,start,end,start,end,TR,sequences,counts)
     except:
         pass
     return
@@ -193,22 +191,23 @@ rule process_M_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 4
+    threads: 8
     resources:
         mem_mb = 500,
-        walltime = '4:00'
+        walltime = '120:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
-            print('chr,start,end,TR,alignments,' + ','.join(breeds),file=fout)#'_'.join(P) for P in product(breeds,['count','sum','var'])),file=fout)
+            print('chr,start,end,TR_start,TR_end,TR,alignments,' + ','.join(breeds),file=fout)
             
             if config.get('debug',False):
                 for i,line in enumerate(fin):
-                    result = process_line(line)
+                    result = process_line_M(line)
                     if result:
                         print(result,file=fout)
+                        fout.flush()
             else:
                 with Pool(threads) as p:
-                    for i, result in enumerate(p.imap_unordered(process_line, fin, 50)):
+                    for i, result in enumerate(p.imap_unordered(process_line_M, fin, 50)):
                         if i % 100 == 0:
                             print(f'done {i=} results',flush=True)
                             fout.flush()
@@ -222,11 +221,11 @@ rule process_regions_PC:
         'TR_tsvs/{pangenome}.{chr}.count'
     threads: 8
     resources:
-        mem_mb = 250,
+        mem_mb = 500,
         walltime = "24:00"
     run:
         with open(input.regions,'r') as fin, open(output[0],'w') as fout:
-            print('chr,start,end,TR,alignments,' + ','.join(breeds),file=fout)
+            print('chr,start,end,TR,TR_start,TR_end,alignments,' + ','.join(breeds),file=fout)
             if config.get('debug',False):
                 pass
             else:
