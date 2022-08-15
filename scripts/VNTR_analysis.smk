@@ -191,10 +191,10 @@ rule process_M_VNTRs:
         fasta = expand(config['fasta_path'] + '{chr}/{asm}_{chr}.fa',chr=range(1,30),asm=breeds)
     output:
         'VNTRs.{rate}.csv'
-    threads: 8
+    threads: 32
     resources:
-        mem_mb = 500,
-        walltime = '120:00'
+        mem_mb = 200,
+        walltime = '24:00'
     run:
         with open(input.VNTRs,'r') as fin, open(output[0],'w') as fout:
             print('chr,start,end,TR_start,TR_end,TR,alignments,' + ','.join(breeds),file=fout)

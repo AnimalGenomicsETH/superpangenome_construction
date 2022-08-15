@@ -14,7 +14,7 @@ TR_low: 10
 TR_high: 100
 TR_divergence_limit: 0.25
 scaling: 'linear'
-timeout: 30 
+timeout: 150 
 
 #fasta
 #flanking_region: 500
