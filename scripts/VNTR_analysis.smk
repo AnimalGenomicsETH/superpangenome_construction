@@ -54,6 +54,8 @@ rule bedtools_intersect:
         awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$6"\\t"$7"\\t"$4"\\t"n"\\t"$8}}' > {output}
         '''
 
+#bedtools intersect -wo -F .01 -a TR/d0_m100.L100.bed -b minigraph.SVs.bed | bedtools merge -i - -c 4,6,7,8 -o distinct,min,max,collapse -delim '|' | awk 'BEGIN{OFS="\t";} {print $1,$5,$6,$2,$3,$7,$4}' > putative_VNTRs.1.merged.bed
+
 rule bedtools_merge:
     input:
         'putative_VNTRs.{rate}.bed'
@@ -98,7 +100,7 @@ def extract_fasta_regions_M(regions,TR_length):
         name = region.rstrip().split()[5]
         if name == '.':
             continue
-        ix,low,high = name.split(':')[3:6]
+        orientation, ix, low, high = name.split(':')[2:6]
         ch,asm = ix[:ix.index('_')],ix[ix.index('_')+1:]
         low, high = int(low), int(high)
 
@@ -112,7 +114,8 @@ def extract_fasta_regions_M(regions,TR_length):
 
     for (ch,asm),(low,high) in region_per_asm.items():
         offset = get_flank_size(TR_length)
-        header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+        header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
+        #header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         sequences[header] = sequence
     return sequences
 
@@ -154,8 +157,8 @@ def postprocess_line(chrom,start,end,TR_start,TR_end,TR,sequences,counts):
 
 
 def process_line_M(line):
-    chrom, start, end, TR_start, TR_end, nodes, count, TR = line.rstrip().split()
-    count = int(count)
+    chrom, start, end, TR_start, TR_end, nodes, TR = line.rstrip().split()
+    count = nodes.count(',')+1
     if '|' in TR:
         TR = Levenshtein.median(TR.split('|'))
     if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
@@ -225,7 +228,7 @@ rule process_regions_PC:
         walltime = "24:00"
     run:
         with open(input.regions,'r') as fin, open(output[0],'w') as fout:
-            print('chr,start,end,TR,TR_start,TR_end,alignments,' + ','.join(breeds),file=fout)
+            print('chr,start,end,TR_start,TR_end,TR,alignments,' + ','.join(breeds),file=fout)
             if config.get('debug',False):
                 pass
             else:
