@@ -110,9 +110,9 @@ def extract_fasta_regions_M(regions,TR_length):
             if high > region_per_asm[(ch,asm)][1]:
                 region_per_asm[(ch,asm)][1] = high
         else:
-            region_per_asm[(ch,asm)] = [low,high]
+            region_per_asm[(ch,asm)] = [low,high,orientation]
 
-    for (ch,asm),(low,high) in region_per_asm.items():
+    for (ch,asm),(low,high,orientation) in region_per_asm.items():
         offset = get_flank_size(TR_length)
         header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
         #header, sequence = subprocess.run(f'samtools faidx {config["fasta_path"]}{ch}/{asm}_{ch}.fa {ch}_{asm}:{low-offset}-{high+offset} | seqtk seq -l 0 -U {"-r" if ch in inverted_chrs.get(asm,[]) else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]
