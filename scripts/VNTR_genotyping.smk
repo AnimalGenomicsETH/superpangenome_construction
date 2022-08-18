@@ -7,9 +7,14 @@ rule advntr_model:
     input:
         'VNTR_LR_genotyping/testable_VNTRs.txt'
     output:
-        'VNTR_LR_genotyping/d0_m100_L100/models.db'
+        'VNTR_LR_genotyping/test/models.db'
+        #'VNTR_LR_genotyping/d0_m100_L100/models.db'
     conda:
         'VNTR'
+    threads: 1
+    resources:
+        mem_mb = 5000,
+        walltime = '120:00'
     shell:
         '''
         while read -r -a p
@@ -27,6 +32,10 @@ rule advntr_genotype:
         'VNTR_LR_genotyping/{sample}.bed'
     conda:
         'VNTR'
+    threads: 2
+    resources:
+        mem_mb = 10000,
+        disk_scratch = 10
     shell:
         '''
         advntr genotype \
@@ -36,6 +45,7 @@ rule advntr_genotype:
         --working_directory $TMPDIR \
         -t {threads} \
         -of bed \
+        -o {output} \
         --haploid
         '''
     
