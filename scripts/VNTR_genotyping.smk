@@ -32,9 +32,10 @@ rule advntr_genotype:
         'VNTR_LR_genotyping/{sample}.bed'
     conda:
         'VNTR'
-    threads: 2
+    threads: 6
     resources:
-        mem_mb = 10000,
+        mem_mb = 7500,
+        walltime = '24:00',
         disk_scratch = 10
     shell:
         '''
