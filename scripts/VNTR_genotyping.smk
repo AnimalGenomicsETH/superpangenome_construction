@@ -7,8 +7,8 @@ rule advntr_model:
     input:
         'VNTR_LR_genotyping/testable_VNTRs.txt'
     output:
-        'VNTR_LR_genotyping/test/models.db'
-        #'VNTR_LR_genotyping/d0_m100_L100/models.db'
+        #'VNTR_LR_genotyping/test/models.db'
+        'VNTR_LR_genotyping/d0_m100_L100/models.db'
     conda:
         'VNTR'
     threads: 1
@@ -32,9 +32,9 @@ rule advntr_genotype:
         'VNTR_LR_genotyping/{sample}.bed'
     conda:
         'VNTR'
-    threads: 6
+    threads: 2
     resources:
-        mem_mb = 7500,
+        mem_mb = 30000,
         walltime = '24:00',
         disk_scratch = 10
     shell:
