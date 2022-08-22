@@ -42,11 +42,13 @@ rule advntr_genotype:
         advntr genotype \
         -a {input.bam} \
         -m {input.models} \
-        -p --naive \
+        -p --naive\
         --working_directory $TMPDIR \
         -t {threads} \
         -of bed \
         -o {output} \
         --haploid
         '''
-    
+ 
+#manual paste to form csv 
+#paste <(awk '{print $1"_"$2"\t"$7}' BSW.bed ) <(cut -f 8 BSW.bed) <(cut -f 8 Gaur.bed) <(cut -f 8 OxO1.bed) <(cut -f 8 OxO2.bed) <(cut -f 8 Pied.bed) <(cut -f 8 Nellore.bed) > truth_genotypes.csv
