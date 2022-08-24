@@ -36,7 +36,7 @@ rule split_fasta:
         fasta = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa',
         fai = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa.fai'
     output:
-        trimmed = temp('edit_distance/{chrom}_{asm}.chunks.trimmed.fasta'),
+        #trimmed = temp('edit_distance/{chrom}_{asm}.chunks.trimmed.fasta'),
         untrimmed = temp('edit_distance/{chrom}_{asm}.chunks.untrimmed.fasta')
     params:
         centromere_min_score = 50000,
@@ -58,7 +58,7 @@ rule split_fasta:
         
         masked_regions = ''
         if start != 1:
-            masked_regions += '\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{i+params.window-1}' for i in range(1,start+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(start,i+params.window-1)}' for i in range(1,start+1,params.window)))
         if end != params.chr_size:
             if masked_regions:
                 masked_regions += '\n'
@@ -69,10 +69,10 @@ rule split_fasta:
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.untrimmed}',shell=True)
     
-        with tempfile.NamedTemporaryFile(mode='w+t') as temp:
-            temp.write('\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
-            temp.seek(0)
-            subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
+        #with tempfile.NamedTemporaryFile(mode='w+t') as temp:
+        #    temp.write('\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
+        #    temp.seek(0)
+        #    subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
 def get_threads(pangenome,trimmed=None):
     if trimmed == 'trimmed':
@@ -88,9 +88,9 @@ def get_threads(pangenome,trimmed=None):
 
 def get_memory(trimmed):
     if trimmed == 'trimmed':
-        return 8000
+        return 10000
     else:
-        return 20000
+        return 40000
 
 #for i in {1..29}; do awk 'BEGIN{OFS=FS="\t";}$1!="L"||$6!="*"{print;}$1=="L"&&$6=="*"{$6="0M";print;}' < cactus_ancestral_${i}.gfa > cactus_${i}.gfa; done
 rule graphaligner:
@@ -101,8 +101,8 @@ rule graphaligner:
         temp('edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.gaf')
     threads: lambda wildcards: get_threads(wildcards.pangenome,wildcards.trimmed)
     resources:
-        mem_mb = 8000,
-        walltime = '4:00'
+        mem_mb = lambda wildcards: get_memory(wildcards.trimmed),
+        walltime = '24:00'
     shell:
         '''
         GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} -x vg --precise-clipping 0.9
