@@ -2,15 +2,15 @@ import subprocess
 import tempfile
 from pathlib import PurePath
 
-breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak']
-HiFi_breeds = ['BSW','Gaur','Nellore','OBV','Pied']
+breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak', 'BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
+HiFi_breeds = ['BSW','Gaur','Nellore','OBV','Pied','BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
 
 localrules: bin_edit_distance
 
 rule all:
     input:
-        expand('edit_distance/{chrom}_{asm}.{pangenome}.untrimmed.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','cactus','minigraph')),
-        expand('edit_distance/{chrom}_{asm}.{pangenome}.trimmed.dist',chrom=range(1,30),asm=HiFi_breeds,pangenome=('pggb','cactus','minigraph'))
+        expand('edit_distance2/{chrom}_{asm}.{pangenome}.untrimmed.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','cactus','minigraph')),
+        expand('edit_distance2/{chrom}_{asm}.{pangenome}.trimmed.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','cactus','minigraph'))
 
 
 rule RepeatMasker:
@@ -36,8 +36,8 @@ rule split_fasta:
         fasta = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa',
         fai = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa.fai'
     output:
-        #trimmed = temp('edit_distance/{chrom}_{asm}.chunks.trimmed.fasta'),
-        untrimmed = temp('edit_distance/{chrom}_{asm}.chunks.untrimmed.fasta')
+        trimmed = temp('edit_distance2/{chrom}_{asm}.chunks.trimmed.fasta'),
+        untrimmed = temp('edit_distance2/{chrom}_{asm}.chunks.untrimmed.fasta')
     params:
         centromere_min_score = 50000,
         telomere_min_score = 1000,
@@ -69,16 +69,18 @@ rule split_fasta:
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.untrimmed}',shell=True)
     
-        #with tempfile.NamedTemporaryFile(mode='w+t') as temp:
-        #    temp.write('\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
-        #    temp.seek(0)
-        #    subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
+        with tempfile.NamedTemporaryFile(mode='w+t') as temp:
+            temp.write('\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
+            temp.seek(0)
+            subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
-def get_threads(pangenome,trimmed=None):
-    if trimmed == 'trimmed':
-        return 8
+def get_threads(wildcards,input):
+    if input.size_mb == 0:
+        return 1
+    if wildcards.trimmed == 'trimmed':
+        return 12
     else:
-        return 4
+        return 2
     if pangenome == 'minigraph':
         return 2
     elif pangenome == 'cactus':
@@ -86,8 +88,10 @@ def get_threads(pangenome,trimmed=None):
     elif pangenome == 'pggb':
         return 2
 
-def get_memory(trimmed):
-    if trimmed == 'trimmed':
+def get_memory(wildcards,input):
+    if input.size_mb == 0:
+        return 100
+    if wildcards.trimmed == 'trimmed':
         return 10000
     else:
         return 40000
@@ -96,23 +100,32 @@ def get_memory(trimmed):
 rule graphaligner:
     input:
         gfa = '/cluster/work/pausch/to_share/sv_analysis/final_data/graph/{pangenome}/{pangenome}_{chrom}.gfa',
-        fasta = lambda wildcards: 'edit_distance/{chrom}_{asm}.chunks.{trimmed}.fasta'
+        fasta = lambda wildcards: 'edit_distance2/{chrom}_{asm}.chunks.{trimmed}.fasta'
     output:
-        temp('edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.gaf')
-    threads: lambda wildcards: get_threads(wildcards.pangenome,wildcards.trimmed)
+        temp('edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.gaf')
+    params:
+        preset = config.get('X-preset','dbg')
+    threads: lambda wildcards,input: get_threads(wildcards,input)
     resources:
-        mem_mb = lambda wildcards: get_memory(wildcards.trimmed),
-        walltime = '24:00'
+        mem_mb = lambda wildcards,input: get_memory(wildcards,input),
+        walltime = '2:00'
     shell:
         '''
-        GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} -x vg --precise-clipping 0.9
+        if [ -s {input.fasta} ]; then
+          GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} --discard-cigar \
+          -x dbg -C -1 \
+          --max-trace-count 5 --precise-clipping 0.9 \
+          --seeds-minimizer-ignore-frequent 0.001 -b 10
+        else
+          touch {output}
+        fi
         '''
 
 rule bin_edit_distance:
     input:
-        'edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.gaf'
+        'edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.gaf'
     output:
-        'edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.dist'
+        'edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.dist'
     shell:
         '''
          awk '{{M[$1]+=$10;L[$1]+=$11}} END {{ for (key in M) {{ print key,M[key],L[key] }} }}' {input} | sort -k1,1V > {output}
