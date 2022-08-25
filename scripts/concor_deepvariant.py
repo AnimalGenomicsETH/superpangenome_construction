@@ -34,11 +34,11 @@ $0}}' | sed 's/_UCD//g' > {output.header}
 
         bcftools reheader -h {output.header} <( sed 's/_UCD//g' {input}) > {output.corvcf}
 
-        bcftools view -i "abs(ILEN)<50" {output.corvcf} |
-        bcftools norm -f $REFGEN -m -any > {output.norm}
+        #bcftools view -i "abs(ILEN)<50" {output.corvcf} |
+        #bcftools norm -f $REFGEN -m -any > {output.norm}
 
-        # awk '$1 ~ /#/ || (length($4) < 50 && length($5) < 50)' {output.corvcf} |
-        # bcftools norm -f $REFGEN -m -any > {output.norm}
+        awk '$1 ~ /#/ || (length($4) < 50 && length($5) < 50)' {output.corvcf} |
+        bcftools norm -f $REFGEN -m -any > {output.norm}
         """
 
 
@@ -54,9 +54,9 @@ rule normalize_deepvar:
     shell:
         """
 
-        # awk '$1 ~ /#/ || (length($4) < 50 && length($5) < 50)'  {input}|
+        #bcftools view -i "abs(ILEN)<50" {input} |
 
-        bcftools view -i "abs(ILEN)<50" {input} |
+        awk '$1 ~ /#/ || (length($4) < 50 && length($5) < 50)'  {input}|
         bcftools norm -f $REFGEN -m -any > {output} 
 
         """
