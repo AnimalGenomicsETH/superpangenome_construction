@@ -109,7 +109,7 @@ rule graphaligner:
     threads: lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
-        walltime = '4:00'
+        walltime = '24:00'
     shell:
         '''
         if [ -s {input.fasta} ]; then
@@ -141,3 +141,5 @@ rule gather_edit:
         '''
         awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' > {output}
         '''
+
+#for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${i}_${j}.${p}.${k}.dist); done;done;done;done > big.csv
