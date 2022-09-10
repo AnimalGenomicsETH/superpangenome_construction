@@ -37,3 +37,6 @@ do
   GFA=$(wc -l gafs.txt | cut -f 1 -d ' ')
   grep -Ff <(comm -13 <(sort beds.txt) <(cut -f 1 -d' ' gafs.txt | sort)) gafs.txt | grep -v UCD | awk -v c=${c} -v g=$GFA '{split($2,a,"_");split($3,b,":"); print c,a[2],b[3],g}' >> missing_nodes.csv
 done
+
+
+grep -hoP "(SUPP_VEC=\d+|INTRASAMPLE_IDLIST=\S+;)" *_B_merged.vcf | paste -d " "  - - | awk '{split($2,a,"."); printf $1" "; for(i in a) printf gsub(",","X",a[i])+1" "; print ""}'
