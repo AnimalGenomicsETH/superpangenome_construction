@@ -6,7 +6,8 @@ dirwork="/cluster/work/pausch/danang/psd/scratch/real_yak2"
 #chromo_list = list(range(1,30))
 #chromo_list=[2,3] + list(range(5,30))
 chromo_list=list(range(1,3))
-assemb_list = ["UCD","Angus","Highland","OBV","Brahman","Yak","BSW","Pied","Gaur","Nellore"]
+assemb_list = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak', 'BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
+#["UCD","Angus","Highland","OBV","Brahman","Yak","BSW","Pied","Gaur","Nellore"]
 #assemb_list = ["UCD","Angus"]
 ref_genome = "UCD"
 rep_library="BosTau9_repeat_library.fasta"
@@ -52,24 +53,24 @@ rule cactus_masking_chromosome:
 rule sketch_assembly:
     input: "assembly/{breed}_aut.fa"
     output: "tree/{breed}.fa.msh"
-    threads: 10
+    threads: 2
     resources:
         mem_mb = 2000,
-        walltime = "01:00"
+        walltime = "30"
     shell:
         """
 
-        mash sketch -p {threads} -o {output} {input}
+        mash sketch -s 10000 -k 25 -p {threads} -o {output} {input}
 
         """
 
 rule combined_sketch:
     input: expand("tree/{breed}.fa.msh", breed=assemb_list)
     output: "tree/combined_sketch.msh"
-    threads: 10
+    threads: 1
     resources:
-        mem_mb = 2000,
-        walltime = "01:00"
+        mem_mb = 5000,
+        walltime = "30"
     shell:
         """
 
@@ -80,14 +81,14 @@ rule combined_sketch:
 rule estimate_distance:
     input: "tree/combined_sketch.msh"
     output: "tree/combined_distance.tsv"
-    threads: 10
+    threads: 2
     resources:
         mem_mb = 1000,
-        walltime = "01:00"
+        walltime = "30"
     shell:
         """
 
-        mash dist {input} {input} > {output}
+        mash dist -p {threads} {input} {input} > {output}
 
         """
 
