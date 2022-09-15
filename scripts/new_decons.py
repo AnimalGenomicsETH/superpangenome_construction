@@ -94,7 +94,9 @@ rule edit_sed:
 
         else 
 
-        sed 's/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t$/\\t.$/g' {input}  | awk 'NF==20 || $1 ~ /#/' | bcftools view -a -i "abs(ILEN)<100000"  > {output}
+        sed 's/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t$/\\t./g' {input}  |\
+        awk '$0 !~ /ID=AT/{{print $0;next}}{{printf "%s\\n##INFO=<ID=CONFLICT,Number=1,Type=String,Description=Uncertain Paths>\\n", $0}}' |\
+         awk 'NF==20 || $1 ~ /#/' | bcftools view -a -i "abs(ILEN)<100000"  > {output}
 
         fi
         """
