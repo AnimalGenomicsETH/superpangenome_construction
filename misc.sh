@@ -40,3 +40,19 @@ done
 
 
 grep -hoP "(SUPP_VEC=\d+|INTRASAMPLE_IDLIST=\S+;)" *_B_merged.vcf | paste -d " "  - - | awk '{split($2,a,"."); printf $1" "; for(i in a) printf gsub(",","X",a[i])+1" "; print ""}'
+
+for j in pggb cactus; do for i in {1..29}; do bcftools norm -m -any ${j}.${i}.vcf | bcftools view -i 'abs(ILEN)>=50' -a | bcftools stats | grep SN >> info.txt ; done; done
+awk '/number of records/||/number of no/ {print $6}' info.txt | paste -d " "  - - | awk '{print $2/$1}' | awk 'NR>29{c+=$1;n+=1} END {print c/n*100}'
+
+
+
+## Getting the VNTR files
+
+
+awk 'NR == FNR { a[$0]; next } {if($0 in a) {print $0",yes";next}{print $0",no"}} ' minigraph.trs all.trs > p2.trs
+
+awk 'NR>1 {print $1","$2","$3}' Nellore.naive.bed > ../advntr.trs
+
+grep -Ff ../advntr.trs ../p2.trs > ../p3.trs 
+
+awk 'NR == FNR { a[$0];next } {if($0 in a) {print $0",yes";next}{print $0",no"}} ../p3.trs ../p2.trs > ../p4.trs
