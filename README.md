@@ -1,4 +1,10 @@
-# Compare pangenome graph construction 
+# Graph construction method impacts variation representation and analyses in a bovine super-pangenome
+
+This work focuses on comparing pangenome constructions methods for the downstream implications of how well (and truthfully) variation is converted into currently-useful formats like VCF.
+
+This reposistory is currently a work-in-progress as code is centralised and cleaned up.
+
+### Components
 
 This project attempts to compare multiple pangenome graph construction.     
 
