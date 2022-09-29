@@ -1,17 +1,23 @@
 
+pangenome_samples = config['pangenome_samples']
+
+rule all:
+    input:
+        expand('graphs/{pangenome}/{chromosome}.gfa',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30))
 
 
 rule minigraph_construct:
     input:
         order = 'sample_order.txt',
-        assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa', sample=pangenome_samples)
-    output: 'graphs/minigraph/{chromosome}.gfa'
+        assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples)
+    output: 
+        temp('graphs/minigraph/{chromosome}.basic.gfa')
     threads: 1
     resources:
         mem_mb = 10000,
         walltime = '4:00'
     params:
-        sample_order = lambda wildcards: ' '.join([l for l in open(input.order)]),
+        sample_order = lambda wildcards, input: ' '.join([l for l in open(input.order)]),
         L = config.get('L',50),
         j = config.get('divergence',0.02)
     shell:
@@ -19,19 +25,46 @@ rule minigraph_construct:
         minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} > {output}
         '''
 
+rule minigraph_call:
+    input:
+        gfa = rules.minigraph_construct.output,
+        sample = 'assemblies/{chromosome}/{sample}.fa'
+    output:
+        'graphs/minigraph/{chromosome}.{sample}.bed'
+    params:
+        L = config.get('L',50),
+        j = config.get('divergence',0.02)
+    shell:
+        '''
+        minigraph -t {threads} -cxasm --call -j {params.j} -L {params.L} {input.gfa} {input.sample} > {output}
+        '''
+
+rule minigraph_path:
+    input:
+        paths = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=pangenome_samples),
+        gfa = 'graphs/minigraph/{chromosome}.basic.gfa'
+    output:
+        'graphs/minigraph/{chromosome}.gfa'
+    shell:
+        '''
+        add p lines
+        '''
+
 
 rule pggb_construct:
     input:
-        assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa', sample=pangenome_samples)
+        assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa', sample=pangenome_samples),
     output:
        gfa = "graph/pggb/{chromosome}.gfa",
     threads: 20
     resources:
         mem_mb = 10000,
-        walltime = "48:00",
+        walltime = '24:00',
         disc_scratch = 30
     params:
         fasta = '$TMPDIR/all.fa.gz',
+        divergence = config.get('divergence'),
+        n_haplotypes = lambda wildcards, input: len(input.assemblies),
         sifdir = sifdir,
         dirwork = dirwork
     shell:
@@ -40,7 +73,7 @@ rule pggb_construct:
         samtools faidx {params.fasta}
         
         singularity exec -B $TMPDIR {params.pggb} \
-        'pggb -i {params.fasta} -t {threads} -s 100000 -p 80 -n 10 \
+        'pggb -i {params.fasta} -t {threads} -s 100000 -p {params.divergence) -n {params.n_haplotypes} \
         -S -o graph'
 
         cp graph/*.smooth.gfa $LS_SUBCWD/{output.gfa}
@@ -48,17 +81,16 @@ rule pggb_construct:
 
         '''
 
-
+localrules: cactus_seqfile
 rule cactus_seqfile:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa.masked', sample=pangenome_samples),
         mash_distances = 'tree/distance.tri'
     output:
         temp('graph/cactus/{chromosome}.seqfile')
-    threads: 10
+    threads: 1
     resources:
-        mem_mb = 1000,
-        walltime = "1:00"
+        mem_mb = 1000
     params:
         fasta_dir="assembly/{chromo}/{chromo}_rep"
     shell:
@@ -68,7 +100,7 @@ rule cactus_seqfile:
 
 rule cactus_construct:
     input:
-        'graph/cactus/{chromosome}.seqfile'
+        rules.cactus_seqfile.output
     output:
         temp('graph/cactus/{chromosome}.hal')
     threads: 20
@@ -78,16 +110,13 @@ rule cactus_construct:
     params:
         jobstore=jobstore + "/dump_{chromo}"
     shell:
-        """
-        source /cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/venv/bin/activate
-        export PATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin:$PATH
-        export PYTHONPATH=/cluster/work/pausch/danang/psd/bin/cactus-bin-v2.0.1/bin/lib:$PYTHONPATH
+        '''
 
         cactus --maxLocalJobs {threads} \
         {params.jobstore}  \
         {input} {output}
 
-        """
+        '''
 
 
 rule cactus_convert:
