@@ -1,22 +1,36 @@
 
 pangenome_samples = config['pangenome_samples']
 
+wildcard_constraints:
+    chromosome = r'\d+',
+    pangenome = r'pggb|cactus|minigraph|assembly'
+
+include: 'decompose_pangenomes.smk'
+
 rule all:
     input:
-        expand('graphs/{pangenome}/{chromosome}.gfa',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30))
+        expand('graphs/{pangenome}/{chromosome}.gfa',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30)),
+        expand('vcfs/{pangenome}/{chromosome}.SV.vcf',pangenome=('minigraph','pggb','cactus','assembly'),chromosome=range(1,30))
 
 ##normalise direction of contigs
-##split fasta, naming scheme
+
+#rule download_fasta:
+#    output:
+#        expand('raw_assemblies/{sample}.fasta',sample=config['pangenome_samples'])
+#    shell:
+#        '''
+#        ./prep_assemblies.sh
+#        '''
 
 rule split_fasta:
     input:
-        lambda wildcards: config['assemblies'][wildcards.sample]
+        'raw_assemblies/{sample}.fasta'
     output:
         'assemblies/{chromosome}/{sample}.fa'
     shell:
         '''
-        #split
-        #rename
+        echo "{wildcards.chromosome}" | seqtk subseq {input} - |\
+        sed 's/>.*/>{wildcards.sample}/' > {output}
         '''
 
 rule repeatmasker_soft:
@@ -31,12 +45,26 @@ rule repeatmasker_soft:
     shell:
         '''
         RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
-        -lib {config['repeat_library']} {input}
+        -lib {config[repeat_library]} {input}
         '''
+
+rule mash_triangle:
+    input:
+        lambda wildcards: expand('raw_assemblies/{sample}.fasta',sample=config[wildcards.sample_set])
+    output:
+        'tree/{sample_set}.lower_triangle.txt'
+    threads: 6
+    resources:
+        mem_mb = 2500,
+        walltime = '4:00'
+    shell:
+        '''
+        mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' {output}
+        '''        
 
 rule minigraph_construct:
     input:
-        order = 'sample_order.txt',
+        mash_distances = expand(rules.mash_triangle.output,sample_set='pangenome_samples'),
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples)
     output: 
         temp('graphs/minigraph/{chromosome}.basic.gfa')
@@ -45,7 +73,7 @@ rule minigraph_construct:
         mem_mb = 10000,
         walltime = '4:00'
     params:
-        sample_order = lambda wildcards, input: ' '.join([l for l in open(input.order)]),
+        sample_order = lambda wildcards, input: ' '.join([l for l in open(input.mash_distances[0])]),
         L = config.get('L',50),
         j = config.get('divergence',0.02)
     shell:
@@ -82,29 +110,27 @@ rule pggb_construct:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
     output:
-       gfa = 'graph/pggb/{chromosome}.gfa',
+       gfa = 'graphs/pggb/{chromosome}.gfa',
     threads: 20
     resources:
         mem_mb = 10000,
         walltime = '24:00',
         disc_scratch = 30
     params:
+        pggb = '',
         fasta = '$TMPDIR/all.fa.gz',
         divergence = config.get('divergence'),
         n_haplotypes = lambda wildcards, input: len(input.assemblies),
-        sifdir = sifdir,
-        dirwork = dirwork
     shell:
         '''
         cat {input} | bgzip -@ {threads} -c > {params.fasta}
         samtools faidx {params.fasta}
         
         singularity exec -B $TMPDIR {params.pggb} \
-        'pggb -i {params.fasta} -t {threads} -s 100000 -p {params.divergence) -n {params.n_haplotypes} \
-        -S -o graph'
+        pggb -i {params.fasta} -t {threads} -s 100000 -p {params.divergence} -n {params.n_haplotypes} \
+        -S -o graph
 
-        cp graph/*.smooth.gfa $LS_SUBCWD/{output.gfa}
-        cp graph/*.smooth.og $LS_SUBCWD/{output.og}
+        cp graph/*.smooth.gfa {output.gfa}
 
         '''
 
@@ -112,35 +138,30 @@ localrules: cactus_seqfile
 rule cactus_seqfile:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa.masked', sample=pangenome_samples),
-        mash_distances = 'tree/distance.tri'
+        mash_distances = expand(rules.mash_triangle.output,sample_set='pangenome_samples')
     output:
-        temp('graph/cactus/{chromosome}.seqfile')
+        temp('graphs/cactus/{chromosome}.seqfile')
     threads: 1
     resources:
         mem_mb = 1000
-    params:
-        fasta_dir="assembly/{chromo}/{chromo}_rep"
     shell:
         '''
-        ./construct_tree.R {input.distance_file} {params.fasta_dir} {output} fa.masked {wildcards.chromo}
+        make_tree
         '''
 
 rule cactus_construct:
     input:
         rules.cactus_seqfile.output
     output:
-        temp('graph/cactus/{chromosome}.hal')
+        temp('graphs/cactus/{chromosome}.hal')
     threads: 20
     resources:
         mem_mb = 5000,
         walltime = '24:00'
-    params:
-        jobstore=jobstore + "/dump_{chromo}"
     shell:
         '''
 
         cactus --maxLocalJobs {threads} \
-        {params.jobstore}  \
         {input} {output}
 
         '''
@@ -149,7 +170,7 @@ rule cactus_convert:
     input:
         rules.cactus_construct.output
     output:
-        'graph/cactus/{chromosome}.gfa'
+        'graphs/cactus/{chromosome}.gfa'
     threads: 4
     resources:
         mem_mb = 2000,
