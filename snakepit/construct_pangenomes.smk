@@ -5,6 +5,34 @@ rule all:
     input:
         expand('graphs/{pangenome}/{chromosome}.gfa',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30))
 
+##normalise direction of contigs
+##split fasta, naming scheme
+
+rule split_fasta:
+    input:
+        lambda wildcards: config['assemblies'][wildcards.sample]
+    output:
+        'assemblies/{chromosome}/{sample}.fa'
+    shell:
+        '''
+        #split
+        #rename
+        '''
+
+rule repeatmasker_soft:
+    input:
+        'assemblies/{chromosome}/{sample}.fa'
+    output:
+        temp('assemblies/{chromosome}/{sample}.fa.masked')
+    threads: 8
+    resources:
+        mem_mb = 1500,
+        walltime = '4:00'
+    shell:
+        '''
+        RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
+        -lib {config['repeat_library']} {input}
+        '''
 
 rule minigraph_construct:
     input:
@@ -50,12 +78,11 @@ rule minigraph_path:
         add p lines
         '''
 
-
 rule pggb_construct:
     input:
-        assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa', sample=pangenome_samples),
+        assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
     output:
-       gfa = "graph/pggb/{chromosome}.gfa",
+       gfa = 'graph/pggb/{chromosome}.gfa',
     threads: 20
     resources:
         mem_mb = 10000,
@@ -84,7 +111,7 @@ rule pggb_construct:
 localrules: cactus_seqfile
 rule cactus_seqfile:
     input:
-        assemblies = expand('assemblies/{{chromosome}}/{sample}_{{chromosome}}.fa.masked', sample=pangenome_samples),
+        assemblies = expand('assemblies/{{chromosome}}/{sample}.fa.masked', sample=pangenome_samples),
         mash_distances = 'tree/distance.tri'
     output:
         temp('graph/cactus/{chromosome}.seqfile')
@@ -106,7 +133,7 @@ rule cactus_construct:
     threads: 20
     resources:
         mem_mb = 5000,
-        walltime = "24:00"
+        walltime = '24:00'
     params:
         jobstore=jobstore + "/dump_{chromo}"
     shell:
@@ -117,7 +144,6 @@ rule cactus_construct:
         {input} {output}
 
         '''
-
 
 rule cactus_convert:
     input:
