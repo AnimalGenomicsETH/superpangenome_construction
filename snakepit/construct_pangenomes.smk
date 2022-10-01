@@ -60,7 +60,7 @@ rule mash_triangle:
     shell:
         '''
         mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' {output}
-        '''        
+        '''
 
 rule minigraph_construct:
     input:
@@ -146,7 +146,7 @@ rule cactus_seqfile:
         mem_mb = 1000
     shell:
         '''
-        make_tree
+        python make_trees.py {input.mash_distances} {input.assemblies} > {output}
         '''
 
 rule cactus_construct:
@@ -160,10 +160,7 @@ rule cactus_construct:
         walltime = '24:00'
     shell:
         '''
-
-        cactus --maxLocalJobs {threads} \
-        {input} {output}
-
+        cactus --maxLocalJobs {threads} {input} {output}
         '''
 
 rule cactus_convert:

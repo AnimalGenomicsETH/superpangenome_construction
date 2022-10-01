@@ -3,7 +3,6 @@ from scipy.cluster import hierarchy
 from scipy.spatial.distance import squareform
 import sys
 
-
 names, vals = [], []
 
 with open(sys.argv[1],'r') as fin:
@@ -12,8 +11,7 @@ with open(sys.argv[1],'r') as fin:
         names.append(parts[0].split('/')[1].split('.')[0])
         vals.append(parts[1:]+[0])
 
-Q=np.asarray([np.pad(a, (0, len(vals) - len(a)), 'constant', constant_values=0) for a in vals],dtype=float)
-
+Q = np.asarray([np.pad(a, (0, len(vals) - len(a)), 'constant', constant_values=0) for a in vals],dtype=float)
 Z = hierarchy.linkage(squareform((Q+Q.T)),method='average',optimal_ordering=True)
 
 def get_newick(node, parent_dist, leaf_names, newick='') -> str:
@@ -30,5 +28,6 @@ def get_newick(node, parent_dist, leaf_names, newick='') -> str:
         return newick
 
 tree = hierarchy.to_tree(Z, False)
-print(get_newick(tree, tree.dist, names))
 
+print(get_newick(tree, tree.dist, names))
+print('\n'.join([f'{N} {P}' for (N,P) in zip(names,sys.argv[2:])]))
