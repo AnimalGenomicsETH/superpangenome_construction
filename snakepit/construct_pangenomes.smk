@@ -95,15 +95,19 @@ rule minigraph_call:
         minigraph -t {threads} -cxasm --call -j {params.j} -L {params.L} {input.gfa} {input.sample} > {output}
         '''
 
+localrules: minigraph_path
 rule minigraph_path:
     input:
         paths = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=pangenome_samples),
         gfa = 'graphs/minigraph/{chromosome}.basic.gfa'
     output:
         'graphs/minigraph/{chromosome}.gfa'
+    params:
+        samples = '\\n'.join(pangenome_samples)
     shell:
         '''
-        add p lines
+        #needs special branch of mgutils.js
+        paste {input.paths} | mgutils.js path <(echo -e "{params.samples}") - | cat {input.gfa} - > {output}
         '''
 
 rule pggb_construct:
