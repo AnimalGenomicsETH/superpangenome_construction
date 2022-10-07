@@ -6,13 +6,9 @@ breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OB
 HiFi_breeds = ['BSW','Gaur','Nellore','OBV','Pied']
 extra_breeds =['BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
 
-localrules: bin_edit_distance
-
 rule all:
     input:
-        #expand('edit_distance/{chrom}_{asm}.{pangenome}.untrimmed.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','cactus','minigraph')),
-        #expand('edit_distance/{chrom}_{asm}.{pangenome}.trimmed.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','cactus','minigraph'))
-        expand('edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.dist',chrom=range(1,30),asm=breeds,pangenome=('pggb','minigraph','cactus'),trimmed=('untrimmed','trimmed'))
+        expand('edit_distanceX/{chrom}_{asm}.chunks.untrimmed.fasta',chrom=range(1,30),asm=breeds)
 
 rule RepeatMasker:
     input:
@@ -33,12 +29,12 @@ rule RepeatMasker:
 
 rule split_fasta:
     input:
-        rep_out = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{chrom}_rep/{asm}_{chrom}.fa.out',
-        fasta = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa',
-        fai = '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{asm}_{chrom}.fa.fai'
+        repeats = 'assemblies/{chromosome}/{sample}.fa.out',
+        fasta = 'assemblies/{chromosome}/{sample}.fa',
+        fai = 'assemblies/{chromosome}/{sample}.fa.fai'
     output:
-        trimmed = temp('edit_distance/{chrom}_{asm}.chunks.trimmed.fasta'),
-        untrimmed = temp('edit_distance/{chrom}_{asm}.chunks.untrimmed.fasta')
+        trimmed = temp('edit_distance/{sample}.{chromosome}.chunks.trimmed.fasta'),
+        untrimmed = temp('edit_distance/{sample}.{chromosome}.chunks.untrimmed.fasta')
     params:
         centromere_min_score = 50000,
         telomere_min_score = 1000,
@@ -52,18 +48,16 @@ rule split_fasta:
         centro_region = subprocess.run(f'awk \'/Satellite\/centr/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.rep_out} | bedtools merge -d 250000 -i - -c 4 -o sum | head -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
         telo_region = subprocess.run(f'awk \'/\\(TTAGGG\\)n/||/\\(TAGGGT\\)n/||/\\(AGGGTT\\)n/||/\\(GGGTTA\\)n/||/\\(GGTTAG\\)n/||/\\(GTTAGG\\)n/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.rep_out} | bedtools merge -d 1000 -i - -c 4 -o sum | tail -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
 
-        #print(f'Regions: {centro_region=} {telo_region=}')
-
         start = 1 if (not centro_region or int(centro_region.split()[-1]) < params.centromere_min_score) else int(centro_region.split()[2])
         end = params.chr_size if (not telo_region or int(telo_region.split()[-1]) < params.telomere_min_score) else int(telo_region.split()[1])
         
         masked_regions = ''
         if start != 1:
-            masked_regions += '\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(start,i+params.window-1)}' for i in range(1,start+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.chromosome}:{i}-{min(start,i+params.window-1)}' for i in range(1,start+1,params.window)))
         if end != params.chr_size:
             if masked_regions:
                 masked_regions += '\n'
-            masked_regions += '\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.chromosome}}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
 
         with tempfile.NamedTemporaryFile(mode='w+t') as temp:
             temp.write(masked_regions)
@@ -75,11 +69,14 @@ rule split_fasta:
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
+        with open(output[0],'w') as fout:
+            fout.write(f'{wildcards.asm},{wildcards.chrom},{start-1},{end-start-1},{params.chr_size-end}')
+
 def get_threads(wildcards,input):
     if input.size_mb == 0:
         return 1
     if wildcards.trimmed == 'trimmed':
-        return 6
+        return 4
     else:
         return 1
     if pangenome == 'minigraph':
@@ -100,31 +97,32 @@ def get_memory(wildcards,input):
 #for i in {1..29}; do awk 'BEGIN{OFS=FS="\t";}$1!="L"||$6!="*"{print;}$1=="L"&&$6=="*"{$6="0M";print;}' < cactus_ancestral_${i}.gfa > cactus_${i}.gfa; done
 rule graphaligner:
     input:
-        gfa = '/cluster/work/pausch/to_share/sv_analysis/final_data/graph/{pangenome}/{pangenome}_{chrom}.gfa',
-        fasta = lambda wildcards: 'edit_distance/{chrom}_{asm}.chunks.{trimmed}.fasta'
+        gfa = 'graphs/{pangenome}/{chromosome}.gfa',
+        fasta = lambda wildcards: 'edit_distance/{sample}.{chromosome}.chunks.{trimmed}.fasta'
     output:
-        temp('edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.gaf')
+        temp('edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.gaf')
     params:
         preset = config.get('X-preset','dbg')
     threads: lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
-        walltime = '24:00'
+        walltime = '4:00'
     shell:
         '''
         if [ -s {input.fasta} ]; then
           GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} --discard-cigar \
           -x dbg -C 750000 \
-          --max-trace-count 5 --precise-clipping 0.9 \
+          --max-trace-count 5  --precise-clipping 0.9 \
           --seeds-minimizer-ignore-frequent 0.001
         else
           touch {output}
         fi
         '''
 
+localrules: bin_edit_distance
 rule bin_edit_distance:
     input:
-        'edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.gaf'
+        rules.graphaligner.output[0]
     output:
         'edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.dist'
     shell:
@@ -132,14 +130,16 @@ rule bin_edit_distance:
          awk '{{M[$1]+=$10;L[$1]+=$11}} END {{ for (key in M) {{ print key,M[key],L[key] }} }}' {input} | sort -k1,1V > {output}
         '''
 
+localrules: gather_edit
 rule gather_edit:
     input:
-        'edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.dist'
+        rules.bin_edit_distance.output[0]
     output:
         'edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.stat'
     shell:
         '''
         awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' > {output}
+        awk '{{split($1,a,":");split(a[2],b,"-"); print b[1]"\\t"b[2]"\\t"1-$2/$3}}' 
         '''
 
 #for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${i}_${j}.${p}.${k}.dist); done;done;done;done > big.csv

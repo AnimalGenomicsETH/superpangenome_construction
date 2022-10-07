@@ -59,8 +59,6 @@ rule bcftools_view:
         bcftools view -e 'abs(ILEN)>=50' {input} > {output.small}
         '''
 
-asm_map = {'Angus':'asm5','Highland':'asm5','OBV':'asm5','BSW':'asm5','Pied':'asm5','Simmental':'asm5','Nellore':'asm10','Brahman':'asm10','Gaur':'asm20','Bison':'asm20','Yak':'asm20'}
-
 rule minimap2_align:
     input:
         ref = 'assemblies/{chromosome}/HER.fa',
