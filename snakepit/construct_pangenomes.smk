@@ -37,7 +37,8 @@ rule repeatmasker_soft:
     input:
         'assemblies/{chromosome}/{sample}.fa'
     output:
-        temp('assemblies/{chromosome}/{sample}.fa.masked')
+        masked = temp('assemblies/{chromosome}/{sample}.fa.masked'),
+        out = temp('assemblies/{chromosome}/{sample}.fa.out')
     threads: 8
     resources:
         mem_mb = 1500,
