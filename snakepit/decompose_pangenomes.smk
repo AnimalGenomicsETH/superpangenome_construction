@@ -13,7 +13,7 @@ rule vg_deconstruct:
     shell:
         '''
         vg deconstruct -p {params.ref_path} -a -e -d 1 -t {threads} {input} |\
-        sed 's/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t\\t/\\t.\\t/g;s/\\t$/\\t./g' {input}  |\
+        sed 's/\\t\\t/\\t.\\t/g;s/\\t$/\\t./g' {input}  |\
         awk '$0 !~ /ID=AT/{{print $0;next}}{{printf "%s\\n##INFO=<ID=CONFLICT,Number=1,Type=String,Description=Uncertain Paths>\\n", $0}}' \
         > {output}
         '''
