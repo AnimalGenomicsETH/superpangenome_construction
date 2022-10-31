@@ -1,4 +1,9 @@
 
+include: 'utility.py'
+
+reference_ID = get_reference_ID()
+
+# WARNING tentatively do not need sed with vg > 1.43
 rule vg_deconstruct:
     input:
         'graphs/{pangenome}/{chromosome}.gfa'
@@ -9,7 +14,7 @@ rule vg_deconstruct:
         mem_mb= 5000,
         walltime= '4:00'
     params:
-        ref_path = 'ref'
+        ref_path = reference_ID
     shell:
         '''
         vg deconstruct -p {params.ref_path} -a -e -d 1 -t {threads} {input} |\
@@ -37,12 +42,12 @@ rule vcfwave:
 rule bcftools_norm:
     input:
         vcf = rules.vcfwave.output,
-        ref = 'assemblies/{chromosome}/HER.fa'
+        reference = expand('assemblies/{{chromosome}}/{reference_ID}.fa',reference_ID = reference_ID)
     output:
         'vcfs/{pangenome}/{chromosome}.norm.vcf'
     shell:
         '''
-        bcftools norm -m -any -f {input.ref} {input.vcf} |\
+        bcftools norm -m -any -f {input.reference} {input.vcf} |\
         bcftools norm -a |\
         bcftools norm -d none > {output}
         '''
@@ -61,7 +66,7 @@ rule bcftools_view:
 
 rule minimap2_align:
     input:
-        ref = 'assemblies/{chromosome}/HER.fa',
+        reference = expand('assemblies/{{chromosome}}/{reference_ID}.fa',reference_ID = reference_ID),
         query = 'assemblies/{chromosome}/{sample}.fa'
     output:
         temp('vcfs/assembly/{chromosome}.{sample}.paf')
@@ -74,13 +79,13 @@ rule minimap2_align:
     shell:
         '''
         minimap2 -cx {params.preset} -t {threads} \
-        --cs {input.ref} {input.query} |\
+        --cs {input.reference} {input.query} |\
         sort -k6,6 -k8,8n > {output}
         '''
 
 rule paftools_call:
     input:
-        ref = 'assemblies/{chromosome}/HER.fa',
+        reference = expand('assemblies/{{chromosome}}/{reference_ID}.fa',reference_ID = reference_ID),
         paf = rules.minimap2_align.output
     output:
         temp('vcfs/assembly/{chromosome}.{sample}.raw.vcf')
@@ -90,7 +95,7 @@ rule paftools_call:
         walltime = '1:00'
     shell:
         '''
-        paftools.js call -f {input.ref} -s {wildcards.sample} {input.paf} > {output}
+        paftools.js call -f {input.reference} -s {wildcards.sample} {input.paf} > {output}
         '''
 
 rule bcftools_merge:

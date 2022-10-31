@@ -5,12 +5,6 @@ wildcard_constraints:
     chromosome = r'\d+',
     pangenome = r'pggb|cactus|minigraph|assembly'
 
-include: 'decompose_pangenomes.smk'
-
-rule all:
-    input:
-        expand('graphs/{pangenome}/{chromosome}.gfa',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30)),
-        expand('vcfs/{pangenome}/{chromosome}.SV.vcf',pangenome=('minigraph','pggb','cactus','assembly'),chromosome=range(1,30))
 
 ##normalise direction of contigs
 
@@ -26,11 +20,13 @@ rule split_fasta:
     input:
         'raw_assemblies/{sample}.fasta'
     output:
-        'assemblies/{chromosome}/{sample}.fa'
+        fa = 'assemblies/{chromosome}/{sample}.fa',
+        fai = 'assemblies/{chromosome}/{sample}.fa.fai',
     shell:
         '''
         echo "{wildcards.chromosome}" | seqtk subseq {input} - |\
-        sed 's/>.*/>{wildcards.sample}/' > {output}
+        sed 's/>.*/>{wildcards.sample}/' > {output.fa}
+        samtools faidx {output.fa}
         '''
 
 rule repeatmasker_soft:
