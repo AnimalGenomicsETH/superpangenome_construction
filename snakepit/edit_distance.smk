@@ -2,32 +2,7 @@ import subprocess
 import tempfile
 from pathlib import PurePath
 
-breeds = ['Angus', 'Bison', 'Brahman', 'BSW', 'Gaur', 'Highland', 'Nellore', 'OBV', 'Pied', 'Simmental', 'UCD', 'Yak', 'BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
-HiFi_breeds = ['BSW','Gaur','Nellore','OBV','Pied']
-extra_breeds =['BS1','BS2','BS3','BS4','BS5','BS6','BS7','BS8']
-
-rule all:
-    input:
-        expand('edit_distanceX/{chrom}_{asm}.chunks.untrimmed.fasta',chrom=range(1,30),asm=breeds)
-
-rule RepeatMasker:
-    input:
-        '/cluster/work/pausch/danang/psd/scratch/real_comp/graph/map_lr/splitfa/{chrom}/{chrom}_BS{N}.fa'
-    output:
-        '/cluster/work/pausch/danang/psd/scratch/assembly/{chrom}/{chrom}_rep/{chrom}_BS{N}.fa.out'
-    params:
-        library = '/cluster/work/pausch/alex/Libraries/BosTau9_repeat_library.fasta',
-        _out = lambda wildcards, output: PurePath(output[0]).parent
-    threads: 8
-    resources:
-        mem_mb = 1500,
-        walltime = '4:00'
-    shell:
-        '''
-         RepeatMasker -xsmall -pa $(({threads}/2)) -dir {param._out} -lib {params.library} -qq -no_is {input} 
-        '''
-
-rule split_fasta:
+rule seperate_centro_telo_regions:
     input:
         repeats = 'assemblies/{chromosome}/{sample}.fa.out',
         fasta = 'assemblies/{chromosome}/{sample}.fa',
@@ -42,7 +17,7 @@ rule split_fasta:
         chr_size = lambda wildcards, input: int([l.split()[1] for l in open(input.fai)][0])
     resources:
         mem_mb = 500,
-        walltime = '30',
+        walltime = '60',
         disk_scratch = 1
     run:
         centro_region = subprocess.run(f'awk \'/Satellite\/centr/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.rep_out} | bedtools merge -d 250000 -i - -c 4 -o sum | head -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
@@ -57,7 +32,7 @@ rule split_fasta:
         if end != params.chr_size:
             if masked_regions:
                 masked_regions += '\n'
-            masked_regions += '\n'.join((f'{wildcards.chromosome}}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.chromosome}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
 
         with tempfile.NamedTemporaryFile(mode='w+t') as temp:
             temp.write(masked_regions)
@@ -103,7 +78,7 @@ rule graphaligner:
         temp('edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.gaf')
     params:
         preset = config.get('X-preset','dbg')
-    threads: lambda wildcards,input: get_threads(wildcards,input)
+    threads: 4#lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
         walltime = '4:00'
@@ -124,7 +99,7 @@ rule bin_edit_distance:
     input:
         rules.graphaligner.output[0]
     output:
-        'edit_distance/{chrom}_{asm}.{pangenome}.{trimmed}.dist'
+        'edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.dist'
     shell:
         '''
          awk '{{M[$1]+=$10;L[$1]+=$11}} END {{ for (key in M) {{ print key,M[key],L[key] }} }}' {input} | sort -k1,1V > {output}
@@ -135,7 +110,7 @@ rule gather_edit:
     input:
         rules.bin_edit_distance.output[0]
     output:
-        'edit_distance2/{chrom}_{asm}.{pangenome}.{trimmed}.stat'
+        'edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.stat'
     shell:
         '''
         awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' > {output}
