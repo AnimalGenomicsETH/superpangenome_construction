@@ -69,15 +69,14 @@ def get_memory(wildcards,input):
     else:
         return 30000
 
-#for i in {1..29}; do awk 'BEGIN{OFS=FS="\t";}$1!="L"||$6!="*"{print;}$1=="L"&&$6=="*"{$6="0M";print;}' < cactus_ancestral_${i}.gfa > cactus_${i}.gfa; done
 rule graphaligner:
     input:
         gfa = 'graphs/{pangenome}/{chromosome}.gfa',
         fasta = lambda wildcards: 'edit_distance/{sample}.{chromosome}.chunks.{trimmed}.fasta'
     output:
-        temp('edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.gaf')
+        temp('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.gaf')
     params:
-        preset = config.get('X-preset','dbg')
+        preset = lambda wildcards: config['graphaligner_parameters'][wildcards.preset]
     threads: 4#lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
@@ -85,10 +84,7 @@ rule graphaligner:
     shell:
         '''
         if [ -s {input.fasta} ]; then
-          GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} --discard-cigar \
-          -x dbg -C 750000 \
-          --max-trace-count 5  --precise-clipping 0.9 \
-          --seeds-minimizer-ignore-frequent 0.001
+          GraphAligner -g {input.gfa} -f {input.fasta} --multimap-score-fraction 1 -a {output} -t {threads} --discard-cigar {params.preset}
         else
           touch {output}
         fi
@@ -99,7 +95,7 @@ rule bin_edit_distance:
     input:
         rules.graphaligner.output[0]
     output:
-        'edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.dist'
+        'edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.dist'
     shell:
         '''
          awk '{{M[$1]+=$10;L[$1]+=$11}} END {{ for (key in M) {{ print key,M[key],L[key] }} }}' {input} | sort -k1,1V > {output}
@@ -110,7 +106,7 @@ rule gather_edit:
     input:
         rules.bin_edit_distance.output[0]
     output:
-        'edit_distance/{sample}.{chromosome}.{pangenome}.{trimmed}.stat'
+        'edit_distance/{sample}.{chromosome}.{pangenome}.{preset,strict|lenient}.{trimmed}.stat'
     shell:
         '''
         awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' > {output}
