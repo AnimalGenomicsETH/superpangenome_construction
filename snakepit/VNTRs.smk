@@ -1,15 +1,5 @@
-include: 'utility.py'
-
 rule TRF:
     input:
-        expand('assemblies/{{chromosome}}/{sample}.fa',sample=reference_ID)
-    output:
-        'VNTRs/TRF/{chromosome}.TRs.bed'
-    shell:
-
-rule TRF:
-    input:
-        #expand('assemblies/{{chromosome}}/{sample}.fa',sample=reference_ID)
         'assemblies/{chromosome}/{sample}.fa'
     output:
         temp('assemblies/{chromosome}/{sample}.fa.2.7.7.80.10.50.500.dat')
@@ -69,8 +59,7 @@ rule gfatools_bubble:
         'VNTRs/minigraph/{chromosome}.bubbles.bed'
     shell:
         '''
-        gfas=({input})
-        for i in {{0..28}}; do gfatools bubble ${{gfas[$i]}} | cut -f -3,12 | sed 's/_UCD//g'; done > {output}
+        gfatools bubble {input} | cut -f -3,12 > {output}
         '''
 
 rule estimate_minigraph_coordinates:
@@ -110,7 +99,7 @@ rule process_VNTRs:
     input:
         ''
     output:
-        ''
+        'bad'
     run:
         pass
 

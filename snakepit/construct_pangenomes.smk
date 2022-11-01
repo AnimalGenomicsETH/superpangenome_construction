@@ -107,6 +107,7 @@ rule minigraph_path:
         paste {input.paths} | mgutils.js path <(echo -e "{params.samples}") - | cat {input.gfa} - > {output}
         '''
 
+#TODO fix the pggb call
 rule pggb_construct:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
@@ -150,6 +151,7 @@ rule cactus_seqfile:
         python make_trees.py {input.mash_distances} {input.assemblies} > {output}
         '''
 
+#TODO test cactus running
 rule cactus_construct:
     input:
         rules.cactus_seqfile.output
