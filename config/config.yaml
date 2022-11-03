@@ -1,0 +1,36 @@
+pangenome_samples:
+  ANG: 'asm5'
+  BIS: 'asm20'
+  BRA: 'asm10'
+  BSW: 'asm20'
+  GAU: 'asm5'
+  HER: 'reference'
+  HIG: 'asm5'
+  NEL: 'asm10'
+  OBV: 'asm5'
+  PIE: 'asm5'
+  SIM: 'asm5'
+  YAK: 'asm20'
+
+additional_samples:
+ Od1: 'a'
+## minigraph bubble size
+L: 50
+divergence: 0.02
+
+## vcf deconstruction
+skip_size: 100000
+
+
+repeat_library: '/cluster/work/pausch/alex/REF_DATA/Repeat_libraries/BosTau9_repeat_library.fasta'
+
+optical_map_URL: 'https://zenodo.org/record/6854879/files/Merged_minQ20_maxDist1000.vcf.gz'
+
+graphaligner_parameters:
+  strict: '-x vg'
+  lenient: '-x dbg -C 750000 --max-trace-count 5  --precise-clipping 0.9 --seeds-minimizer-ignore-frequent 0.001'
+
+intersection_parameters:
+  strict: 'max_dist=25'
+  lenient: 'max_dist_linear=1 max_dist=1000'
+  optical: 'max_dist_linear=1 max_dist=1000'
