@@ -20,11 +20,12 @@ rm -rf ncbi_dataset
 
 
 
-#for p in BRA ANG
-#do
-#  sort -k11,11nr ${p}.paf | grep -vE "(NKL|X|Y)" | sort -k6,6n | awk '{print $6,$5,$11}' | sort -k2,2h | awk '{seen[$1" "$2]+=$3} END { for (key in seen) { print key,seen[key] } }' |  sort -k1,1n -k3,3nr | awk '!orient[$1]{orient[$1]=$2} END { for (key in orient) { print key,orient[key] } }' > ${p}.directions
-#  awk '$2=="-" {print $1}' ${p}.directions | seqtk subseq ${p}.fasta - | seqtk seq -r - > ${p}_fixed.fasta
-#  awk '$2=="+" {print $1}' ${p}.directions | seqtk subseq ${p}.fasta - >> ${p}_fixed.fasta
-#rm ${p}.directions
-#mv ${p}_fixed.fasta ${p}.fasta
-#done
+for p in BRA ANG
+do
+  minimap2 -x asm20 -t 4 HER.fasta ${p}.fasta > ${p}.paf
+  sort -k11,11nr ${p}.paf | grep -vE "(NKL|X|Y)" | sort -k6,6n | awk '{print $6,$5,$11}' | sort -k2,2h | awk '{seen[$1" "$2]+=$3} END { for (key in seen) { print key,seen[key] } }' |  sort -k1,1n -k3,3nr | awk '!orient[$1]{orient[$1]=$2} END { for (key in orient) { print key,orient[key] } }' > ${p}.directions
+  awk '$2=="-" {print $1}' ${p}.directions | seqtk subseq ${p}.fasta - | seqtk seq -r - > ${p}_fixed.fasta
+  awk '$2=="+" {print $1}' ${p}.directions | seqtk subseq ${p}.fasta - >> ${p}_fixed.fasta
+rm ${p}.directions
+mv ${p}_fixed.fasta ${p}.fasta
+done

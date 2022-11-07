@@ -112,28 +112,31 @@ rule pggb_construct:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
     output:
-       gfa = 'graphs/pggb/{chromosome}.gfa',
+        gfa = 'graphs/pggb/{chromosome}.gfa'
     threads: 20
     resources:
         mem_mb = 10000,
         walltime = '24:00',
         disc_scratch = 30
     params:
-        pggb = '',
+        pggb = config['pggb']['container'],
+        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
         fasta = '$TMPDIR/all.fa.gz',
-        divergence = config.get('divergence'),
+        divergence = config['pggb']['divergence'],
         n_haplotypes = lambda wildcards, input: len(input.assemblies),
+        segment_length = config['pggb']['segment_length']
     shell:
         '''
         cat {input} | bgzip -@ {threads} -c > {params.fasta}
         samtools faidx {params.fasta}
         
-        singularity exec -B $TMPDIR {params.pggb} \
-        pggb -i {params.fasta} -t {threads} -s 100000 -p {params.divergence} -n {params.n_haplotypes} \
-        -S -o graph
+        singularity exec -B $TMPDIR {params.container} \
+        pggb -i {params.fasta} -t {threads} \
+        -s {params.segment_length} -p {params.divergence} -n {params.n_haplotypes} \
+        --skip-viz --temp-dir $TMPDIR \
+        -o {params._dir}
 
-        cp graph/*.smooth.gfa {output.gfa}
-
+        mv {params._dir}/*.smooth.gfa {output.gfa}
         '''
 
 localrules: cactus_seqfile
@@ -160,10 +163,15 @@ rule cactus_construct:
     threads: 20
     resources:
         mem_mb = 5000,
-        walltime = '24:00'
+        walltime = '24:00',
+        scratch = '50G'
+    params:
+        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix('')
     shell:
         '''
-        cactus --maxLocalJobs {threads} {input} {output}
+        cactus --maxLocalJobs {threads} \
+        --logLevel CRITICAL --workDir $TMPDIR \
+        {params._dir} {input} {output}
         '''
 
 rule cactus_convert:
