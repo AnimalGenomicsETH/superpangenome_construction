@@ -75,12 +75,13 @@ def read_mash_triangle(mash_triangle,strip_leading=False):
     Q = np.asarray([np.pad(a, (0, len(vals) - len(a)), 'constant', constant_values=0) for a in vals],dtype=float)
     return names, (Q+Q.T)
 
-def make_minigraph_order(mash_triangle):
+def make_minigraph_order(mash_triangle,sequences=None):
     ref_ID = get_reference_ID()
     names, dists = read_mash_triangle(mash_triangle)
-    ref_ID_index = [i for i,s in enumerate(names) if ref_ID in s][0]
+    sequences = sequences or names
+    ref_ID_index = [i for i,s in enumerate(sequences) if ref_ID in s][0]
 
-    return ' '.join(map(lambda k:k[0], sorted(zip(names,dists[ref_ID_index]),key=lambda k: k[1])))
+    return ' '.join(map(lambda k:k[0], sorted(zip(sequences,dists[ref_ID_index]),key=lambda k: k[1])))
 
 rule minigraph_construct:
     input:
@@ -90,10 +91,10 @@ rule minigraph_construct:
         temp('graphs/minigraph/{chromosome}.basic.gfa')
     threads: 1
     resources:
-        mem_mb = 10000,
+        mem_mb = 15000,
         walltime = '4:00'
     params:
-        sample_order = lambda wildcards, input:make_minigraph_order(input.mash_distances[0]),
+        sample_order = lambda wildcards, input:make_minigraph_order(input.mash_distances[0],input.assemblies),
         L = config['minigraph']['L'],
         j = config['minigraph']['divergence']
     shell:
@@ -110,6 +111,9 @@ rule minigraph_call:
     params:
         L = config['minigraph']['L'],
         j = config['minigraph']['divergence']
+    threads: 1
+    resources:
+        mem_mb = 10000
     shell:
         '''
         minigraph -t {threads} -cxasm --call -j {params.j} -L {params.L} {input.gfa} {input.sample} > {output}
@@ -139,7 +143,7 @@ rule pggb_construct:
     threads: 12
     resources:
         mem_mb = 4000,
-        walltime = '4:00',
+        walltime = '24:00',
         scratch = '30G'
     params:
         pggb = config['pggb']['container'],
