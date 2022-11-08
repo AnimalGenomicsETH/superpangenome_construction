@@ -37,7 +37,7 @@ rule repeatmasker_soft:
         out = temp('assemblies/{chromosome}/{sample}.fa.out')
     threads: 8
     resources:
-        mem_mb = 1500,
+        mem_mb = 300,
         walltime = '4:00'
     shell:
         '''
@@ -59,6 +59,29 @@ rule mash_triangle:
         mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' {output}
         '''
 
+import numpy as np
+from scipy.spatial.distance import squareform
+
+def read_mash_triangle(mash_triangle,strip_leading=False):
+    names, vals = [], []
+    with open(mash_triangle,'r') as fin:
+        for i,line in enumerate(fin):
+            parts = line.rstrip().split()
+            if strip_leading:
+                names.append(parts[0].split('/')[1].split('.')[0])
+            else:
+                names.append(parts[0])
+            vals.append(parts[1:]+[0])
+    Q = np.asarray([np.pad(a, (0, len(vals) - len(a)), 'constant', constant_values=0) for a in vals],dtype=float)
+    return names, (Q+Q.T)
+
+def make_minigraph_order(mash_triangle):
+    ref_ID = get_reference_ID()
+    names, dists = read_mash_triangle(mash_triangle)
+    ref_ID_index = [i for i,s in enumerate(names) if ref_ID in s][0]
+
+    return ' '.join(map(lambda k:k[0], sorted(zip(names,dists[ref_ID_index]),key=lambda k: k[1])))
+
 rule minigraph_construct:
     input:
         mash_distances = expand(rules.mash_triangle.output,sample_set='pangenome_samples'),
@@ -70,9 +93,9 @@ rule minigraph_construct:
         mem_mb = 10000,
         walltime = '4:00'
     params:
-        sample_order = lambda wildcards, input: ' '.join([l for l in open(input.mash_distances[0])]),
-        L = config.get('L',50),
-        j = config.get('divergence',0.02)
+        sample_order = lambda wildcards, input:make_minigraph_order(input.mash_distances[0]),
+        L = config['minigraph']['L'],
+        j = config['minigraph']['divergence']
     shell:
         '''
         minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} > {output}
@@ -85,8 +108,8 @@ rule minigraph_call:
     output:
         'graphs/minigraph/{chromosome}.{sample}.bed'
     params:
-        L = config.get('L',50),
-        j = config.get('divergence',0.02)
+        L = config['minigraph']['L'],
+        j = config['minigraph']['divergence']
     shell:
         '''
         minigraph -t {threads} -cxasm --call -j {params.j} -L {params.L} {input.gfa} {input.sample} > {output}
@@ -113,14 +136,14 @@ rule pggb_construct:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
     output:
         gfa = 'graphs/pggb/{chromosome}.gfa'
-    threads: 20
+    threads: 12
     resources:
-        mem_mb = 10000,
-        walltime = '24:00',
-        disc_scratch = 30
+        mem_mb = 4000,
+        walltime = '4:00',
+        scratch = '30G'
     params:
         pggb = config['pggb']['container'],
-        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
+        _dir = lambda wildcards, output: Path(output[0]).with_suffix('').resolve(),
         fasta = '$TMPDIR/all.fa.gz',
         divergence = config['pggb']['divergence'],
         n_haplotypes = lambda wildcards, input: len(input.assemblies),
@@ -130,7 +153,9 @@ rule pggb_construct:
         cat {input} | bgzip -@ {threads} -c > {params.fasta}
         samtools faidx {params.fasta}
         
-        singularity exec -B $TMPDIR {params.container} \
+        mkdir -p {params._dir}
+
+        singularity exec -B $TMPDIR -B {params._dir} {params.pggb} \
         pggb -i {params.fasta} -t {threads} \
         -s {params.segment_length} -p {params.divergence} -n {params.n_haplotypes} \
         --skip-viz --temp-dir $TMPDIR \
@@ -139,6 +164,20 @@ rule pggb_construct:
         mv {params._dir}/*.smooth.gfa {output.gfa}
         '''
 
+def get_newick(node, parent_dist, leaf_names, newick='') -> str:
+    if node.is_leaf():
+        return f'{leaf_names[node.id]}:{parent_dist - node.dist}{newick}'
+    else:
+        if len(newick) > 0:
+            newick = f'):{parent_dist - node.dist}{newick}'
+        else:
+            newick = ');'
+        newick = get_newick(node.get_left(), node.dist, leaf_names, newick=newick)
+        newick = get_newick(node.get_right(), node.dist, leaf_names, newick=f',{newick}')
+        newick = f'({newick}'
+        return newick
+
+from scipy.cluster import hierarchy
 localrules: cactus_seqfile
 rule cactus_seqfile:
     input:
@@ -149,10 +188,13 @@ rule cactus_seqfile:
     threads: 1
     resources:
         mem_mb = 1000
-    shell:
-        '''
-        python make_trees.py {input.mash_distances} {input.assemblies} > {output}
-        '''
+    run:
+        names, dists = read_mash_triangle(input.mash_distances[0])
+        Z = hierarchy.linkage(squareform(dists),method='average',optimal_ordering=True)
+        tree = hierarchy.to_tree(Z, False)
+        with open(output[0],'w') as fout:
+            fout.write(get_newick(tree, tree.dist, names))
+            fout.write('\n'.join([f'{N} {P}' for (N,P) in zip(names,input.assemblies)]))
 
 #TODO test cactus running
 rule cactus_construct:
@@ -166,7 +208,8 @@ rule cactus_construct:
         walltime = '24:00',
         scratch = '50G'
     params:
-        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
+        cactus = config['cactus']['container']
     shell:
         '''
         cactus --maxLocalJobs {threads} \
