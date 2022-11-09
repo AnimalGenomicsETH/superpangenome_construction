@@ -142,7 +142,7 @@ rule pggb_construct:
         gfa = 'graphs/pggb/{chromosome}.gfa'
     threads: 12
     resources:
-        mem_mb = 4000,
+        mem_mb = 2000,
         walltime = '24:00',
         scratch = '30G'
     params:
@@ -165,7 +165,7 @@ rule pggb_construct:
         --skip-viz --temp-dir $TMPDIR \
         -o {params._dir}
 
-        mv {params._dir}/*.smooth.gfa {output.gfa}
+        mv {params._dir}/*.smooth.final.gfa {output.gfa}
         '''
 
 def get_newick(node, parent_dist, leaf_names, newick='') -> str:

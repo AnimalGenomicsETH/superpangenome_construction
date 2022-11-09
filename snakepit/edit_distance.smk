@@ -1,6 +1,5 @@
 import subprocess
 import tempfile
-from pathlib import PurePath
 
 rule seperate_centro_telo_regions:
     input:

@@ -15,7 +15,7 @@ rule prepare_optical_maps:
         _dir = lambda wildcards: PurePath(output.all).parent,
         samples = 'Hereford_1,Hereford_2,Nelore_N2,Nelore_N4689',
         chromosomes = ','.join(map(str,range(1,30)))
-    envs:
+    envmodules:
         'eth_proxy'
     threads: 1
     resources:
