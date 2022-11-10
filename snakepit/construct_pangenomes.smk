@@ -99,7 +99,9 @@ rule minigraph_construct:
         j = config['minigraph']['divergence']
     shell:
         '''
-        minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} > {output}
+        echo -e "H\tVN:Z:1.1" > {output}
+        minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} |\
+        sed 's/\S*\(:\)\S*//g' | sed 's/[[:blank:]]*$//' >> {output}
         '''
 
 rule minigraph_call:
@@ -193,32 +195,36 @@ rule cactus_seqfile:
     resources:
         mem_mb = 1000
     run:
-        names, dists = read_mash_triangle(input.mash_distances[0])
+        names, dists = read_mash_triangle(input.mash_distances[0],True)
         Z = hierarchy.linkage(squareform(dists),method='average',optimal_ordering=True)
         tree = hierarchy.to_tree(Z, False)
         with open(output[0],'w') as fout:
-            fout.write(get_newick(tree, tree.dist, names))
+            fout.write(get_newick(tree, tree.dist, names)+'\n')
             fout.write('\n'.join([f'{N} {P}' for (N,P) in zip(names,input.assemblies)]))
 
 #TODO test cactus running
 rule cactus_construct:
     input:
-        rules.cactus_seqfile.output
+        assemblies = expand('assemblies/{{chromosome}}/{sample}.fa.masked', sample=pangenome_samples),
+        seqFile = rules.cactus_seqfile.output
     output:
-        temp('graphs/cactus/{chromosome}.hal')
-    threads: 20
+        jobStore = temp(directory('graphs/cactus/{chromosome}')),
+        hal = temp('graphs/cactus/{chromosome}.hal')
+    threads: 1
     resources:
-        mem_mb = 5000,
-        walltime = '24:00',
+        mem_mb = 3000,
+        walltime = '1:00',
         scratch = '50G'
     params:
-        _dir = lambda wildcards, output: PurePath(output[0]).with_suffix(''),
+        _asmDir = lambda wildcards, input: Path(input.assemblies[0]).parent.parent.resolve(),
+        _dir = lambda wildcards, output: Path(output.hal).with_suffix('').resolve(),
         cactus = config['cactus']['container']
     shell:
         '''
+        singularity exec -B $TMPDIR -B {params._dir} -B {params._asmDir} {params.cactus} \
         cactus --maxLocalJobs {threads} \
         --logLevel CRITICAL --workDir $TMPDIR \
-        {params._dir} {input} {output}
+        {output.jobStore} {input.seqFile} {output.hal}
         '''
 
 rule cactus_convert:
