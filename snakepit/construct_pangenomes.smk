@@ -99,9 +99,7 @@ rule minigraph_construct:
         j = config['minigraph']['divergence']
     shell:
         '''
-        echo -e "H\tVN:Z:1.1" > {output}
-        minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} |\
-        sed 's/\S*\(:\)\S*//g' | sed 's/[[:blank:]]*$//' >> {output}
+        minigraph -t {threads} -cxggs -j {params.j} -L {params.L} {params.sample_order} > {output}
         '''
 
 rule minigraph_call:
@@ -124,16 +122,16 @@ rule minigraph_call:
 localrules: minigraph_path
 rule minigraph_path:
     input:
-        paths = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=pangenome_samples),
+        paths = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=filter(lambda x: x != get_reference_ID(), pangenome_samples)),
         gfa = 'graphs/minigraph/{chromosome}.basic.gfa'
     output:
         'graphs/minigraph/{chromosome}.gfa'
     params:
-        samples = '\\n'.join(pangenome_samples)
+        samples = '\\n'.join(filter(lambda x: x != get_reference_ID(), pangenome_samples))
     shell:
         '''
         #needs special branch of mgutils.js
-        paste {input.paths} | mgutils.js path <(echo -e "{params.samples}") - | cat {input.gfa} - > {output}
+        {{ vg convert -r 0 -g {input.gfa} -f ; paste {input.paths} | mgutils.js path <(echo -e "{params.samples}") - | sed 's/s//g' ; }} > {output}
         '''
 
 #TODO fix the pggb call
@@ -210,10 +208,10 @@ rule cactus_construct:
     output:
         jobStore = temp(directory('graphs/cactus/{chromosome}')),
         hal = temp('graphs/cactus/{chromosome}.hal')
-    threads: 1
+    threads: 18
     resources:
-        mem_mb = 3000,
-        walltime = '1:00',
+        mem_mb = 5000,
+        walltime = '24:00',
         scratch = '50G'
     params:
         _asmDir = lambda wildcards, input: Path(input.assemblies[0]).parent.parent.resolve(),
@@ -221,24 +219,29 @@ rule cactus_construct:
         cactus = config['cactus']['container']
     shell:
         '''
+        mkdir -p {params._dir}
         singularity exec -B $TMPDIR -B {params._dir} -B {params._asmDir} {params.cactus} \
         cactus --maxLocalJobs {threads} \
         --logLevel CRITICAL --workDir $TMPDIR \
-        {output.jobStore} {input.seqFile} {output.hal}
+        {output.jobStore}/jobStore {input.seqFile} {output.hal}
         '''
 
 rule cactus_convert:
     input:
-        rules.cactus_construct.output
+        rules.cactus_construct.output.hal
     output:
         'graphs/cactus/{chromosome}.gfa'
-    threads: 4
+    threads: 1
     resources:
-        mem_mb = 2000,
+        mem_mb = 10000,
         walltime = '4:00'
+    params:
+        _dir = lambda wildcards, output: Path(output[0]).parent.resolve(),
+        cactus = config['cactus']['container']
     shell:
         '''
-        hal2vg --inMemory {input} |\
-        vg convert -t {threads} -f |\
-        awk '$1 !~ /P/{{print;next}} $2 !~ /Anc/{{print}}' > {output}
+        singularity exec -B {params._dir} {params.cactus} \
+        hal2vg --hdf5InMemory {input} |\
+        vg convert -t {threads} -f - |\
+        awk -v OFS='\t' '$1!~/P/ {{print;next}} $2!~/Anc/ {{split($2,a,".");$2=a[1];print}}' > {output}
         '''
