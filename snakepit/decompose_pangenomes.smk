@@ -12,7 +12,9 @@ rule vg_deconstruct:
     shell:
         '''
         vg deconstruct -p {params.ref_path} -a -e -d 1 -t {threads} {input} |\
+        sed $'s/\\t\\t/\\t.\\t/g;s/\\t$/\\t./g' |\
         awk '$0 !~ /ID=AT/{{print $0;next}}{{printf "%s\\n##INFO=<ID=CONFLICT,Number=1,Type=String,Description=Uncertain Paths>\\n", $0}}' > {output}
+        sed -i $'s/\t\t/\t.\t/g' {output}
         '''
 
 rule vcfwave:
@@ -37,11 +39,14 @@ rule bcftools_norm:
         reference = expand('assemblies/{{chromosome}}/{reference_ID}.fa',reference_ID = get_reference_ID())
     output:
         'vcfs/{pangenome}/{chromosome}.norm.vcf'
+    threads: 2
+    resources:
+        mem_mb = 25000
     shell:
         '''
-        bcftools norm -m -any -f {input.reference} {input.vcf} |\
-        bcftools norm -a |\
-        bcftools norm -d none > {output}
+        bcftools norm --threads {threads} -m -any -f {input.reference} {input.vcf} |\
+        bcftools norm --threads {threads} -a |\
+        bcftools norm --threads {threads} -d none > {output}
         '''
 
 #TODO probably want small vcf as gz for isec
@@ -93,7 +98,7 @@ rule paftools_call:
 
 rule bcftools_merge:
     input:
-        expand('vcfs/assembly/{{chromosome}}.{sample}.raw.vcf',sample=config['pangenome_samples'])
+        expand('vcfs/assembly/{{chromosome}}.{sample}.raw.vcf',sample=filter(lambda x: x != get_reference_ID(), pangenome_samples))
     output:
         temp('vcfs/assembly/{chromosome}.raw.vcf')
     threads: 2
@@ -101,5 +106,5 @@ rule bcftools_merge:
         mem_mb = 2500
     shell:
         '''
-        bcftools merge --threads {threads} -o {output} {input}
+        bcftools merge --threads {threads} --no-index -o {output} {input}
         '''
