@@ -9,10 +9,10 @@ def get_variants(_group):
 rule prepare_optical_maps:
     output:
         all = temp('vcfs/optical/all.vcf.gz'), 
-        chromosomes = expand('vcfs/optical/{chromosome}.SV.vcf',chromosome=range(1,30))
+        chromosomes = temp(expand('vcfs/optical/{chromosome}.vcf',chromosome=range(1,30)))
     params:
         URL = config['optical_map_URL'],
-        _dir = lambda wildcards: PurePath(output.all).parent,
+        _dir = lambda wildcards, output: PurePath(output.all).parent,
         samples = 'Hereford_1,Hereford_2,Nelore_N2,Nelore_N4689',
         chromosomes = ','.join(map(str,range(1,30)))
     envmodules:
@@ -23,18 +23,28 @@ rule prepare_optical_maps:
     shell:
         '''
         wget -O {output.all} {params.URL}
-        bcftools view --threads {threads} -s {params.samples} -i '(ALT="<DEL>"||ALT="<INS>"||ALT="<DUP>")&&ABS(INFO/SVLEN)<1000000' {output.all} | bcftools norm -d none | bcftools +scatter -o optical -s {params.chromosomes}
-        rename .vcf .SV.vcf *.vcf
+        bcftools view --threads {threads} -s {params.samples} -i '(ALT="<DEL>"||ALT="<INS>"||ALT="<DUP>")&&ABS(INFO/SVLEN)<1000000' {output.all} | bcftools norm -d none | bcftools +scatter -o {params._dir} -s {params.chromosomes}
+        '''
+
+localrules: rename_optical_chromosomes
+rule rename_optical_chromosomes:
+    input:
+        'vcfs/optical/{chromosome}.vcf'
+    output:
+        'vcfs/optical/{chromosome}.SV.vcf'
+    shell:
+        '''
+        bcftools annotate --rename-chrs <(echo -e "{wildcards.chromosome}\tHER") -o {output} {input}
         '''
 
 rule jasmine:
     input:
-        lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group))
+        vcfs = lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group)),
+        reference = expand('assemblies/{{chromosome}}/{ref_ID}.fa',ref_ID=get_reference_ID())
     output:
         'vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf'
     params:
-        _input = lambda wildcards, input: ','.join(input),
-        reference = config['pangenome_samples'][get_reference_ID()],
+        _input = lambda wildcards, input: ','.join(input.vcfs),
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]
     conda:
         'jasmine'
@@ -45,7 +55,8 @@ rule jasmine:
         scratch = '5G'
     shell:
         '''
-        jasmine --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
-        genome_file={params.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type --keep_var_ids \
-        {params.dist}
+        java -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
+        --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
+        genome_file={input.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type \
+        {params.settings}
         '''
