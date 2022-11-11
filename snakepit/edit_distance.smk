@@ -19,8 +19,8 @@ rule seperate_centro_telo_regions:
         walltime = '60',
         disk_scratch = 1
     run:
-        centro_region = subprocess.run(f'awk \'/Satellite\/centr/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.rep_out} | bedtools merge -d 250000 -i - -c 4 -o sum | head -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
-        telo_region = subprocess.run(f'awk \'/\\(TTAGGG\\)n/||/\\(TAGGGT\\)n/||/\\(AGGGTT\\)n/||/\\(GGGTTA\\)n/||/\\(GGTTAG\\)n/||/\\(GTTAGG\\)n/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.rep_out} | bedtools merge -d 1000 -i - -c 4 -o sum | tail -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
+        centro_region = subprocess.run(f'awk \'/Satellite\/centr/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.repeats} | bedtools merge -d 250000 -i - -c 4 -o sum | head -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
+        telo_region = subprocess.run(f'awk \'/\\(TTAGGG\\)n/||/\\(TAGGGT\\)n/||/\\(AGGGTT\\)n/||/\\(GGGTTA\\)n/||/\\(GGTTAG\\)n/||/\\(GTTAGG\\)n/ {{print $5"\\t"$6"\\t"$7"\\t"$1}}\' {input.repeats} | bedtools merge -d 1000 -i - -c 4 -o sum | tail -n 1',shell=True,capture_output=True).stdout.decode("utf-8")
 
         start = 1 if (not centro_region or int(centro_region.split()[-1]) < params.centromere_min_score) else int(centro_region.split()[2])
         end = params.chr_size if (not telo_region or int(telo_region.split()[-1]) < params.telomere_min_score) else int(telo_region.split()[1])
@@ -39,12 +39,12 @@ rule seperate_centro_telo_regions:
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.untrimmed}',shell=True)
     
         with tempfile.NamedTemporaryFile(mode='w+t') as temp:
-            temp.write('\n'.join((f'{wildcards.chrom}_{wildcards.asm}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
+            temp.write('\n'.join((f'{wildcards.chromosome}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
         with open(output[0],'w') as fout:
-            fout.write(f'{wildcards.asm},{wildcards.chrom},{start-1},{end-start-1},{params.chr_size-end}')
+            fout.write(f'{wildcards.sample},{wildcards.chromosome},{start-1},{end-start-1},{params.chr_size-end}')
 
 def get_threads(wildcards,input):
     if input.size_mb == 0:
