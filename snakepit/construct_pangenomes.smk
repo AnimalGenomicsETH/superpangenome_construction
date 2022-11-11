@@ -134,7 +134,6 @@ rule minigraph_path:
         {{ vg convert -r 0 -g {input.gfa} -f ; paste {input.paths} | mgutils.js path <(echo -e "{params.samples}") - | sed 's/s//g' ; }} > {output}
         '''
 
-#TODO fix the pggb call
 rule pggb_construct:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
@@ -200,7 +199,6 @@ rule cactus_seqfile:
             fout.write(get_newick(tree, tree.dist, names)+'\n')
             fout.write('\n'.join([f'{N} {P}' for (N,P) in zip(names,input.assemblies)]))
 
-#TODO test cactus running
 rule cactus_construct:
     input:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa.masked', sample=pangenome_samples),
