@@ -44,7 +44,8 @@ rule bcftools_norm:
         mem_mb = 5000
     shell:
         '''
-        bcftools norm --threads {threads} -m -any -f {input.reference} {input.vcf} |\
+        bcftools annotate -x INFO {input.vcf} |\
+        bcftools norm --threads {threads} -m -any -f {input.reference} |\
         bcftools norm --threads {threads} -d none > {output}
         '''
 
@@ -57,12 +58,12 @@ rule bcftools_view:
         small = 'vcfs/{pangenome}/{chromosome}.small.vcf'
     threads: 1
     resources:
-        mem_mb = 50000
+        mem_mb = 5000
     shell:
         '''
         bcftools view -i 'abs(ILEN)>=50' {input} > {output.SV}
         #need to strip INFO annotations as huge bubbles explode the vcf size
-        bcftools view -e 'abs(ILEN)>=50' {input} | bcftools annotate -x INFO | bcftools norm --threads {threads} -a | bcftools norm --rm-dup exact > {output.small}
+        bcftools view -e 'abs(ILEN)>=50' {input} | bcftools norm --threads {threads} -a | bcftools norm --rm-dup exact > {output.small}
         '''
 
 rule minimap2_align:
