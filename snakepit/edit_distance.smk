@@ -27,11 +27,11 @@ rule seperate_centro_telo_regions:
         
         masked_regions = ''
         if start != 1:
-            masked_regions += '\n'.join((f'{wildcards.chromosome}:{i}-{min(start,i+params.window-1)}' for i in range(1,start+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.sample}:{i}-{min(start,i+params.window-1)}' for i in range(1,start+1,params.window)))
         if end != params.chr_size:
             if masked_regions:
                 masked_regions += '\n'
-            masked_regions += '\n'.join((f'{wildcards.chromosome}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
+            masked_regions += '\n'.join((f'{wildcards.sample}:{i}-{min(params.chr_size,i+params.window-1)}' for i in range(end,params.chr_size+1,params.window)))
 
         with tempfile.NamedTemporaryFile(mode='w+t') as temp:
             temp.write(masked_regions)
@@ -39,12 +39,12 @@ rule seperate_centro_telo_regions:
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.untrimmed}',shell=True)
     
         with tempfile.NamedTemporaryFile(mode='w+t') as temp:
-            temp.write('\n'.join((f'{wildcards.chromosome}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
+            temp.write('\n'.join((f'{wildcards.sample}:{i}-{min(end,i+params.window-1)}' for i in range(start,end+1,params.window))))
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
-        with open(output[0],'w') as fout:
-            fout.write(f'{wildcards.sample},{wildcards.chromosome},{start-1},{end-start-1},{params.chr_size-end}')
+        #with open(output[0],'w') as fout:
+        #    fout.write(f'{wildcards.sample},{wildcards.chromosome},{start-1},{end-start-1},{params.chr_size-end}')
 
 def get_threads(wildcards,input):
     if input.size_mb == 0:
@@ -108,8 +108,7 @@ rule gather_edit:
         'edit_distance/{sample}.{chromosome}.{pangenome}.{preset,strict|lenient}.{trimmed}.stat'
     shell:
         '''
-        awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' > {output}
-        awk '{{split($1,a,":");split(a[2],b,"-"); print b[1]"\\t"b[2]"\\t"1-$2/$3}}' 
+        awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' {input} > {output}
         '''
 
 #for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${i}_${j}.${p}.${k}.dist); done;done;done;done > big.csv
