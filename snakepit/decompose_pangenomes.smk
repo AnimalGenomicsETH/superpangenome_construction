@@ -30,7 +30,7 @@ rule vcfwave:
         skip_size = config.get('skip_size',0)
     shell:
         '''
-        bcftools annotate -x INFO {input} |\ 
+        bcftools annotate -x INFO {input} |\
         vcfwave -t {threads} -L {params.skip_size} -k > {output}
         '''
 
@@ -58,15 +58,22 @@ rule bcftools_view:
         rules.bcftools_norm.output
     output:
         SV = 'vcfs/{pangenome}/{chromosome}.SV.vcf',
-        small = 'vcfs/{pangenome}/{chromosome}.small.vcf.gz'
+        small = multiext('vcfs/{pangenome}/{chromosome}.small.vcf.gz','','.tbi')
     threads: 1
     resources:
         mem_mb = 5000
     shell:
         '''
         bcftools view -i 'abs(ILEN)>=50' {input} > {output.SV}
-        #need to strip INFO annotations as huge bubbles explode the vcf size
-        bcftools view -e 'abs(ILEN)>=50' {input} | bcftools norm --threads {threads} -a | bcftools norm --rm-dup exact | bcftools view -c 1 | bcftools sort -T $TMPDIR -o {output.small}
+
+        bcftools view -e 'abs(ILEN)>=50' {input} |\
+        bcftools norm --threads {threads} -a |\
+        bcftools norm --rm-dup exact |\
+        bcftools view -c 1 |\
+        bcftools norm -m +both |\
+        bcftools sort -T $TMPDIR -o {output.small[0]}
+
+        tabix -p vcf {output.small[0]}
         '''
 
 rule minimap2_align:
