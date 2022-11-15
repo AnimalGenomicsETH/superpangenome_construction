@@ -1,10 +1,13 @@
 #include: 'utility.py'
 
 def get_variants(_group):
-    if _group == 'calls':
-        return ('minigraph','cactus','pggb','assembly')
-    else:
-        return ('minigraph','cactus','pggb','assembly','optical')
+    match _group:
+        case 'calls':
+            return ('minigraph','cactus','pggb','assembly')
+        case 'base-level':
+            return ('cactus','pggb','assembly')
+        case _:
+            return ('minigraph','cactus','pggb','assembly','optical')
 
 rule prepare_optical_maps:
     output:
@@ -59,4 +62,28 @@ rule jasmine:
         --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
         genome_file={input.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type \
         {params.settings}
+        '''
+
+rule bcftools_isec:
+    input:
+        expand('vcfs/{pangenome}/{{chromosome}}.small.vcf.gz',pangenome=get_variants('base-level'))
+    output:
+        'vcfs/isec/{chromosome}.{mode}.isec'
+    threads: 2
+    resources:
+        mem_mb = 1500
+    shell:
+        '''
+        bcftools isec -c {wildcards.mode} --threads {threads} -n +1 -o {output} {input}
+        '''
+
+localrules: count_isec_overlaps
+rule count_isec_overlaps:
+    input:
+        rules.bcftools_isec.output
+    output:
+        'vcfs/isec/{chromosome}.{mode}.txt'
+    shell:
+        '''
+        awk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
         '''
