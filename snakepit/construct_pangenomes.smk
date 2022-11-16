@@ -241,5 +241,6 @@ rule cactus_convert:
         singularity exec -B {params._dir} {params.cactus} \
         hal2vg --hdf5InMemory {input} |\
         vg convert -t {threads} -f - |\
-        awk -v OFS='\t' '$1!~/P/ {{print;next}} $2!~/Anc/ {{split($2,a,".");$2=a[1];print}}' > {output}
+        awk -v OFS='\t' '$1!~/P/ {{print;next}} $2!~/Anc/ {{split($2,a,".");$2=a[1];print}}' |\
+        sed 's/\*/0M/g' > {output}
         '''
