@@ -224,6 +224,7 @@ rule cactus_construct:
         {output.jobStore}/jobStore {input.seqFile} {output.hal}
         '''
 
+#TODO * to 0M should be fixed in latest cactus
 rule cactus_convert:
     input:
         rules.cactus_construct.output.hal
