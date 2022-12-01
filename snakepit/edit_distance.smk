@@ -12,7 +12,7 @@ rule seperate_centro_telo_regions:
     params:
         centromere_min_score = 50000,
         telomere_min_score = 1000,
-        window = config.get('window',100000),
+        window = config['graphaligner_parameters']['window'],
         chr_size = lambda wildcards, input: int([l.split()[1] for l in open(input.fai)][0])
     resources:
         mem_mb = 500,

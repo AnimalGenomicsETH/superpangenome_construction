@@ -209,8 +209,8 @@ rule cactus_construct:
         hal = temp('graphs/cactus/{chromosome}.hal')
     threads: 18
     resources:
-        mem_mb = 5000,
-        walltime = '24:00',
+        mem_mb = 3000,
+        walltime = '4:00',
         scratch = '50G'
     params:
         _asmDir = lambda wildcards, input: Path(input.assemblies[0]).parent.parent.resolve(),
@@ -225,7 +225,6 @@ rule cactus_construct:
         {output.jobStore}/jobStore {input.seqFile} {output.hal}
         '''
 
-#TODO * to 0M should be fixed in latest cactus
 rule cactus_convert:
     input:
         rules.cactus_construct.output.hal
