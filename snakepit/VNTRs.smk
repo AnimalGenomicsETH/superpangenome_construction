@@ -1,3 +1,7 @@
+pangenome_samples = config['pangenome_samples']
+def get_reference_ID():
+    return 'HER'
+
 rule repeatmasker_to_bed:
     input:
         'assemblies/{chromosome}/{sample}.fa.out'
@@ -21,7 +25,7 @@ rule TRF:
         '''
         TRF {input} 2 7 7 80 10 50 500 -h -ngs > {output}
         '''
-q
+
 rule postprocess_TRF:
     input:
         TR = rules.TRF.output[0],
@@ -49,9 +53,9 @@ rule odgi_position:
         TRs = expand('VNTRs/TRF/{sample}.{{chromosome}}.TR.bed',sample=get_reference_ID())
     output:
         'VNTRs/{pangenome,pggb|cactus}/{chromosome}.liftover.bed'
-    threads: 4
+    threads: 2
     resources:
-        mem_mb = 2000,
+        mem_mb = 2500,
         walltime = '4:00'
     shell:
         '''        
@@ -61,44 +65,47 @@ rule odgi_position:
 ## simplify bubble -> coords
 rule gfatools_bubble:
     input:
-        'graphs/minigraph/{chromosome}.basic.gfa'
+        gfa = 'graphs/minigraph/{chromosome}.basic.gfa',
+        TRs = expand('VNTRs/TRF/{sample}.{{chromosome}}.TR.bed',sample=get_reference_ID()),
+        beds = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=pangenome_samples)
     output:
-        'VNTRs/minigraph/{chromosome}.bubbles.bed'
+        'VNTRs/minigraph/{chromosome}.overlaps.bed'
     shell:
         '''
-        gfatools bubble {input} | cut -f -3,12 > {output}
+        gfatools bubble {input.gfa} | cut -f -3,12 |\
+        bedtools intersect -f 0.0000000001 -wo -b - -a {input.TRs} |\
+        bedtools merge -c 4,8 -o distinct,collapse |\
+        python {workflow.basedir}/mg.py {input.beds} > {output}
         '''
 
-rule estimate_minigraph_coordinates:
+rule convert_minigraph:
     input:
-        bubbles = rules.gfatools_bubble.output[0],
-        TRs = expand('VNTRs/TRF/{sample}.{{chromosome}}.TR.bed',sample=get_reference_ID())
+        TRs = 'VNTRs/minigraph/{chromosome}.overlaps.bed',
+        beds = expand('graphs/minigraph/{{chromosome}}.{sample}.bed',sample=pangenome_samples),
     output:
         'VNTRs/minigraph/{chromosome}.liftover.bed'
-    params:
-        threshold = 0.000000001, #lambda wildcards: int(wildcards.rate)/100,
-        dist = config.get('merging_distance',0)
-    shell:
-        '''
-        bedtools intersect -f {params.threshold} -wo -a {input.bubbles} -b {input.TRs} |\
-        awk '{{n=split($4, a, ","); print $1"\\t"$2"\\t"$3"\\t"$6"\\t"$7"\\t"$4"\\t"n"\\t"$8}}' |\
-        bedtools merge -d {params.dist} -c 4,5,6,7,8 -o min,max,distinct,sum,distinct -delim '|' > {output}
-        '''
+    run:
+        with open(input.TRs) as fin:
+            for line in fin:
+                *TR_information, bubbles = line.split()
+                source, *_, sink = bubbles.split(',')
+                print('\t'.join(TR_information),end='\t',file=output[0])
 
+                TR_coordinates = dict()
 
-while read a; do awk -v X=$a -v SI=$(echo $a | cut -d',' -f 1) -v SO=$(echo $a | rev| cut -d',' -f 1 | rev) '$4==(">"SI)&&$5==(">"SO)&&$6!="." {split($6,a,":"); print a[4]":"a[5]"-"a[6]}' graphs/minigraph/*bed | tr '\n' '\t'; echo -en "\n" ; done < <(cut -f 6 VNTRs/minigraph/28.liftover.bed | head)
+                for node,key in zip((source,sink),(4,5)):
+                    for hit in subprocess.run(f"awk '${key}==\">{node}\"' {input.beds}",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1]:
+                        hit = hit.split()[-1]
+                        if hit == '.':
+                            continue
+                        parts = hit.split(':')
+                        if parts[3] in TR_coordinates:
+                            TR_coordinates[parts[3]] += f'-{parts[key]},{parts[2]}'
+                        elif key == 4:
+                            TR_coordinates[parts[3]] = parts[key]
 
+                print('\t'.join((f'{sample}:{coord}' for sample,coord in TR_coordinates.items())),file=output[0])
 
-chrom, start, end, TR_start, TR_end, nodes, TR = line.rstrip().split()
-    count = nodes.count(',')+1
-    if '|' in TR:
-        TR = Levenshtein.median(TR.split('|'))
-    if config.get('low',2) < count < config.get('high',math.inf) and config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
-
-        regions = []
-        for node in nodes.split('|'):
-            source, *_, sink = node.split(',')
-            regions.extend(subprocess.run(f"awk '$4==\">{source}\"&&$5==\">{sink}\"' {chrom}/*bed",shell=True,capture_output=True).stdout.decode("utf-8").split('\n')[:-1])
 
 
 import regex
