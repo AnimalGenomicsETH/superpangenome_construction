@@ -38,7 +38,7 @@ rule repeatmasker_soft:
         cat = temp('assemblies/{chromosome}/{sample}.fa.cat.gz')
     threads: 8
     resources:
-        mem_mb = 300,
+        mem_mb = 1000,
         walltime = '4:00'
     shell:
         '''
@@ -232,7 +232,7 @@ rule cactus_convert:
         'graphs/cactus/{chromosome}.gfa'
     threads: 1
     resources:
-        mem_mb = 10000,
+        mem_mb = 25000,
         walltime = '4:00'
     params:
         _dir = lambda wildcards, output: Path(output[0]).parent.resolve(),
