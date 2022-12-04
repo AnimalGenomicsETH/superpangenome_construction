@@ -39,7 +39,7 @@ rule repeatmasker_soft:
     threads: 8
     resources:
         mem_mb = 1000,
-        walltime = '4:00'
+        walltime = '24:00'
     shell:
         '''
         RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
@@ -92,8 +92,8 @@ rule minigraph_construct:
         temp('graphs/minigraph/{chromosome}.basic.gfa')
     threads: 1
     resources:
-        mem_mb = 15000,
-        walltime = '4:00'
+        mem_mb = 20000,
+        walltime = '24:00'
     params:
         sample_order = lambda wildcards, input:make_minigraph_order(input.mash_distances[0],input.assemblies),
         L = config['minigraph']['L'],
@@ -140,9 +140,9 @@ rule pggb_construct:
         assemblies = expand('assemblies/{{chromosome}}/{sample}.fa', sample=pangenome_samples),
     output:
         gfa = 'graphs/pggb/{chromosome}.gfa'
-    threads: 12
+    threads: 16
     resources:
-        mem_mb = 2000,
+        mem_mb = 4000,
         walltime = '24:00',
         scratch = '30G'
     params:
@@ -232,7 +232,7 @@ rule cactus_convert:
         'graphs/cactus/{chromosome}.gfa'
     threads: 1
     resources:
-        mem_mb = 25000,
+        mem_mb = 35000,
         walltime = '4:00'
     params:
         _dir = lambda wildcards, output: Path(output[0]).parent.resolve(),

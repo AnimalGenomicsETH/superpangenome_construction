@@ -24,8 +24,8 @@ rule vcfwave:
         'vcfs/{pangenome}/{chromosome}.wavey.vcf'
     threads: 1
     resources:
-        mem_mb= 5000,
-        walltime= '24:00'
+        mem_mb= 15000,
+        walltime= '120:00'
     params:
         skip_size = config.get('skip_size',0)
     shell:
