@@ -117,13 +117,13 @@ rule process_VNTRs:
     output:
         'VNTRs/{pangenome}/{chromosome}.VNTR.counts'
     params:
-        samples = pangenome_samples
+        samples = list(pangenome_samples.keys())
     threads: 8
     resources:
         mem_mb = 1500
     run:
         with open(input[0],'r') as fin, open(output[0],'w') as fout:
-            print(','.join(['chromosome','start','end','TR','valid',]+samples),file=fout)
+            print(','.join(['chromosome','start','end','TR','valid',]+params.samples),file=fout)
             if config.get('debug',False):
                 for i,line in enumerate(fin):
                     result = process_VNTR_line(line,wildcards.chromosome,params.samples)
