@@ -78,52 +78,38 @@ rule gfatools_bubble:
         '''
 
 import regex
-punctuation = regex.compile(r'[:,-]')
+#fancy regex to make it non-capturing (?:) but also correctly catch the coordinate "-" but not the orientation "-"
+punctuation = regex.compile(r'(?::|,|\d-\d)')
 
 def extract_fasta(regions,chromosome,TR_length):
     sequences = {}
-    offset = 500#get_flank_size(TR_length)
+    offset = TR_length*10
     for region in regions:
         sample, start, stop, orientation = punctuation.split(region)
-        if orientation == '+':
-            start = int(start) - offset
-            stop = int(stop) + offset
-            extra_flag = ''
-        else:
-            start = int(stop) - offset
-            stop = int(start) + offset
-            extra_flag = '-r'
-        sequences[sample] = subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{start}-{stop} | seqtk seq -U -l 0 {extra_flag}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1]
-
+        sequences[sample] = subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{start}-{stop} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1]
     return sequences
 
 import math
 from collections import defaultdict
 def count_VNTRs(sequences,TR):
-    allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))# if config.get('scaling','linear') != 'log' else math.floor(math.sqrt(len(TR)))
+    allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
     counts = dict()
     for sample, sequence in sequences.items():
         try:
             counts[sample] = len(regex.findall(f"(?eV1)({TR}){{2i+2d+1s<={allowed_errors}}}",sequence,concurrent=True,timeout=config.get('timeout',60)))
         except TimeoutError:
-            counts[asm_ID] = -1
+            counts[sample] = -1
             break
     return counts
 
 def process_VNTR_line(line,chromosome,samples):
-    if True:
-        chrom, start, end, TR, *regions = line.rstrip().split()
-        if config.get('TR_low',5) <= len(TR) <= config.get('TR_high',math.inf):
-            sequences = extract_fasta(regions,chromosome,len(TR))
-
-            counts = count_VNTRs(sequences,TR)
-            return ','.join(map(str,(chromosome,start,end,TR,len(sequences),*[counts.get(sample,math.nan) for sample in samples])))
-            return postprocess_line(chrom,start,end,start,end,TR,sequences,counts)
-    #except Exception as e:
-    #    print(e)
-    return
+    chrom, start, end, TR, *regions = line.rstrip().split()
+    sequences = extract_fasta(regions,chromosome,len(TR))
+    counts = count_VNTRs(sequences,TR)
+    return ','.join(map(str,(chromosome,start,end,TR,len(sequences),*[counts.get(sample,math.nan) for sample in samples])))
 
 from functools import partial
+from multiprocessing import Pool
 
 rule process_VNTRs:
     input:
@@ -132,10 +118,12 @@ rule process_VNTRs:
         'VNTRs/{pangenome}/{chromosome}.VNTR.counts'
     params:
         samples = pangenome_samples
+    threads: 8
+    resources:
+        mem_mb = 1500
     run:
         with open(input[0],'r') as fin, open(output[0],'w') as fout:
-            #print('chr,start,end,TR_start,TR_end,TR,alignments,' + ','.join(),file=fout)
-            
+            print(','.join(['chromosome','start','end','TR','valid',]+samples),file=fout)
             if config.get('debug',False):
                 for i,line in enumerate(fin):
                     result = process_VNTR_line(line,wildcards.chromosome,params.samples)
@@ -144,8 +132,8 @@ rule process_VNTRs:
                         fout.flush()
             else:
                 with Pool(threads) as p:
-                    for i, result in enumerate(p.imap_unordered(partial(process_VNTR_line,chromosome=wildcards.chromosome,samples=params.samples), fin, 50)):
-                        if i % 100 == 0:
+                    for i, result in enumerate(p.imap_unordered(partial(process_VNTR_line,chromosome=wildcards.chromosome,samples=params.samples), fin, 10)):
+                        if i % 10 == 0:
                             print(f'done {i=} results',flush=True)
                             fout.flush()
                         if result:
