@@ -33,18 +33,20 @@ rule postprocess_TRF:
     output:
         TR = 'VNTRs/TRF/{sample}.{chromosome}.TR.bed'
     params:
-        min_length = 100,
+        min_length = 50,
         max_length = 10000,
         min_TR_length = 10,
         max_TR_length = 100,
-        TR_merge_window = 100
+        TR_merge_window = 100,
+        min_repeats = 5
     shell:
         '''
         awk -v m={params.min_length} -v M={params.max_length} -v l={params.min_TR_length} -v L={params.max_TR_length} '{{if($1~/@/){{C=substr($1,2)}} else{{ if($1~/[[:digit:]+]/&&($2-$1)>m&&($2-$1)<M&&length($14)>=l&&length($14)<=L) {{print C"\\t"$1"\\t"$2"\\t"$8"\\t"$14}}}}}}' {input.TR} |\
         bedtools subtract -A -f 0.9 -F 0.000001 -a - -b {input.repeats} |\
         sort -k1,1 -k2,2n |\
         bedtools merge -d {params.TR_merge_window} -c 5 -o collapse |\
-        awk -v OFS='\t' '{{split($4,st,","); min=""; for (i in st) {{  if (min == "" || length (st[i]) < length (min)) {{ min = st[i] }} }} print $1,$2,$3,min}}' > {output.TR}
+        awk -v OFS='\t' '{{split($4,st,","); min=""; for (i in st) {{  if (min == "" || length (st[i]) < length (min)) {{ min = st[i] }} }} print $1,$2,$3,min}}' |\
+        awk -v MIN={params.min_repeats} '($3-$2)/length($4)>=MIN' > {output.TR}
         '''
 
 rule odgi_position:
@@ -79,20 +81,19 @@ rule gfatools_bubble:
 
 import regex
 #fancy regex to make it non-capturing (?:) but also correctly catch the coordinate "-" but not the orientation "-"
-punctuation = regex.compile(r'(?::|,|\d-\d)')
+punctuation = regex.compile(r'(?:\w+|\d+|\+|\-$)')
 
 def extract_fasta(regions,chromosome,TR_length):
     sequences = {}
-    offset = TR_length*10
+    offset = TR_length * 10
     for region in regions:
-        sample, start, stop, orientation = punctuation.split(region)
-        sequences[sample] = subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{start}-{stop} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1]
+        sample, start, stop, orientation = punctuation.findall(region)
+        sequences[sample] = subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{int(start)-offset}-{int(stop)+offset} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1]
     return sequences
 
 import math
-from collections import defaultdict
 def count_VNTRs(sequences,TR):
-    allowed_errors = int(len(TR)*config.get('TR_divergence_limit',0))
+    allowed_errors = min(10,int(len(TR)*config.get('TR_divergence_limit',0)))
     counts = dict()
     for sample, sequence in sequences.items():
         try:
@@ -138,7 +139,6 @@ rule process_VNTRs:
                             fout.flush()
                         if result:
                             print(result,file=fout)
-
 
 rule advntr_model:
     input:
