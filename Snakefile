@@ -13,7 +13,7 @@ include: 'snakepit/utility.py'
 include: 'snakepit/construct_pangenomes.smk'
 include: 'snakepit/decompose_pangenomes.smk'
 include: 'snakepit/edit_distance.smk'
-include: 'snakepit/VNTRs.smk'
+#include: 'snakepit/VNTRs.smk'
 include: 'snakepit/vcf_analysis.smk'
 
 rule all:
@@ -24,6 +24,7 @@ rule all:
         expand('vcfs/{pangenome}/{chromosome}.SV.vcf',pangenome=('minigraph','pggb','cactus','assembly'),chromosome=range(1,30)),
         expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf',chromosome=range(1,30),_group='calls',setting=('strict','lenient')),
         expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf',chromosome=range(1,30),_group='all',setting=('optical',)),
+        expand('vcfs/isec/{chromosome}.{mode}.txt',chromosome=range(1,30),mode=('none',)),
         #edit distances
-        expand('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.stat',sample=pangenome_samples,chromosome=range(1,30),pangenome=('minigraph','pggb','cactus'),trimmed=('trimmed','untrimmed'),preset='lenient'),
-        expand('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.stat',sample=additional_samples,chromosome=range(1,30),pangenome=('minigraph','pggb','cactus'),trimmed=('trimmed','untrimmed'),preset='lenient')
+        expand('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.gaf',sample=pangenome_samples,chromosome=range(1,30),pangenome=('minigraph','pggb','cactus'),trimmed=('trimmed','untrimmed'),preset='lenient'),
+        #expand('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.stat',sample=additional_samples,chromosome=range(1,30),pangenome=('minigraph','pggb','cactus'),trimmed=('trimmed','untrimmed'),preset='lenient')

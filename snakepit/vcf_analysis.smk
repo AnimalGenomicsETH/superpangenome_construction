@@ -64,6 +64,17 @@ rule jasmine:
         {params.settings}
         '''
 
+localrules: summarise_jasmine
+rule summarise_jasmine:
+    input:
+        expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf',chromosome=range(1,30),allow_missing=True)
+    output:
+        'vcfs/jasmine/{_group}.{setting}.stat'
+    shell:
+        '''
+        grep -hoP "SUPP_VEC=\K\d+" {input} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print k,A[k] }} }}' > {output}
+        '''
+
 rule bcftools_isec:
     input:
         expand('vcfs/{pangenome}/{{chromosome}}.small.vcf.gz',pangenome=get_variants('base-level'))
@@ -85,5 +96,5 @@ rule count_isec_overlaps:
         'vcfs/isec/{chromosome}.{mode}.txt'
     shell:
         '''
-        awk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
+        mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
         '''
