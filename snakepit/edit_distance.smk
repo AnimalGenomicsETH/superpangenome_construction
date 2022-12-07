@@ -64,9 +64,9 @@ def get_memory(wildcards,input):
     if input.size_mb == 0:
         return 100
     if wildcards.trimmed == 'trimmed':
-        return 15000
+        return 40000
     else:
-        return 30000
+        return 35000
 
 rule graphaligner:
     input:
@@ -111,4 +111,4 @@ rule gather_edit:
         awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' {input} > {output}
         '''
 
-#for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${i}_${j}.${p}.${k}.dist); done;done;done;done > big.csv
+#for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${j}.${i}.${p}.lenient.${k}.dist); done;done;done;done > big.csv
