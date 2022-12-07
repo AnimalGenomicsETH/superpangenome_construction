@@ -245,3 +245,27 @@ rule cactus_convert:
         awk -v OFS='\t' '$1!~/P/ {{print;next}} $2!~/Anc/ {{split($2,a,"#");$2=a[1];print}}' |\
         sed 's/\*/0M/g' > {output}
         '''
+
+rule odgi_stats:
+    input:
+        'graphs/{pangenome}/{chromosome}.gfa'
+    output:
+        'graphs/{pangenome}/{chromosome}.stats.yaml'
+    threads: 1
+    resources:
+        mem_mb = 7500,
+        walltime = '30'
+    shell:
+        '''
+        odgi stats -i {input} -f -S -y -s -p > {output}
+        '''
+
+rule summarise_gfa_stats:
+    input:
+        expand(rules.odgi_stats.output,chromosome=range(1,30),allow_missing=True)
+    output:
+        'graphs/{pangenome}/stats.yaml'
+    shell:
+        '''
+        awk '{{ if ($1~/(length|edges|steps|file_size_in_bytes)/)  {{ A[$1]+=$2 }} else {{ if ($1~/nodes/&&A["nodes:"]==0) {{ A[$1]+=$2 }} }} }}  END {{ for (key in A) {{ print key,A[key] }} }}' {input} > {output}
+        '''
