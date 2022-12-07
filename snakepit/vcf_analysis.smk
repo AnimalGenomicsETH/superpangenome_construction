@@ -35,9 +35,11 @@ rule rename_optical_chromosomes:
         'vcfs/optical/{chromosome}.vcf'
     output:
         'vcfs/optical/{chromosome}.SV.vcf'
+    params:
+        reference_ID = get_reference_ID()
     shell:
         '''
-        bcftools annotate --rename-chrs <(echo -e "{wildcards.chromosome}\tHER") -o {output} {input}
+        bcftools annotate --rename-chrs <(echo -e "{wildcards.chromosome}\t{params.reference_ID}") -o {output} {input}
         '''
 
 rule jasmine:
@@ -91,9 +93,9 @@ rule bcftools_isec:
 localrules: count_isec_overlaps
 rule count_isec_overlaps:
     input:
-        rules.bcftools_isec.output
+        expand(rules.bcftools_isec.output,chromosome=range(10,30),allow_missing=True)
     output:
-        'vcfs/isec/{chromosome}.{mode}.txt'
+        'vcfs/isec/{mode}.txt'
     shell:
         '''
         mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
