@@ -58,7 +58,7 @@ rule bcftools_view:
         rules.bcftools_norm.output
     output:
         SV = 'vcfs/{pangenome}/{chromosome}.SV.vcf',
-        small = multiext('vcfs/{pangenome}/{chromosome}.small.vcf.gz','','.tbi')
+        small = multiext('vcfs/{pangenome}/{chromosome}.smallX.vcf.gz','','.tbi')
     threads: 1
     resources:
         mem_mb = 5000
@@ -74,6 +74,17 @@ rule bcftools_view:
         bcftools sort -T $TMPDIR -o {output.small[0]}
 
         tabix -p vcf {output.small[0]}
+        '''
+
+rule deannotate:
+    input:
+        multiext('vcfs/{pangenome}/{chromosome}.smallX.vcf.gz','','.tbi')
+    output:
+        multiext('vcfs/{pangenome}/{chromosome}.small.vcf.gz','','.tbi')
+    shell:
+        '''
+        bcftools annotate -x INFO -o {output[0]} {input[0]}
+        tabix -p vcf {output[0]}
         '''
 
 rule minimap2_align:

@@ -260,6 +260,9 @@ rule odgi_stats:
         odgi stats -i {input} -f -S -y -s -p > {output}
         '''
 
+#LINE TO GET REF SIZE
+#grep -hA 5 "HER"  graphs/minigraph/*.stats.yaml  | awk '$1~/nucleotides:/ {c+= $2} END {print c}'
+
 rule summarise_gfa_stats:
     input:
         expand(rules.odgi_stats.output,chromosome=range(1,30),allow_missing=True)

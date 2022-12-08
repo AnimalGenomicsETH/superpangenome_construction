@@ -66,15 +66,32 @@ rule jasmine:
         {params.settings}
         '''
 
+rule stratify_jasmine_repeats:
+    input:
+        vcf = rules.jasmine.output,
+        repeats = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True)
+    output:
+        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.non_repetitive.vcf',
+        repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitivevcf'
+    resources:
+        walltime = '10'
+    shell:
+        '''
+        bedtools subtract -A -a {input.vcf} -b {input.repeats} > {output.non_repetitive}
+        bedtools intersect -u -a {input.vcf} -b {input.repeats} > {output.repetitive}
+        '''
+
 localrules: summarise_jasmine
 rule summarise_jasmine:
     input:
-        expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf',chromosome=range(1,30),allow_missing=True)
+        non_repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.non_reptitive.vcf',chromosome=range(1,30),allow_missing=True),
+        repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.reptitive.vcf',chromosome=range(1,30),allow_missing=True)
     output:
         'vcfs/jasmine/{_group}.{setting}.stat'
     shell:
         '''
-        grep -hoP "SUPP_VEC=\K\d+" {input} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print k,A[k] }} }}' > {output}
+        grep -hoP "SUPP_VEC=\K\d+" {input.non_repetitive} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print "non_repetitive",k,A[k] }} }}' > {output}
+        grep -hoP "SUPP_VEC=\K\d+" {input.repetitive} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print "repetitive",k,A[k] }} }}' >> {output}
         '''
 
 rule bcftools_isec:
@@ -93,10 +110,27 @@ rule bcftools_isec:
 localrules: count_isec_overlaps
 rule count_isec_overlaps:
     input:
-        expand(rules.bcftools_isec.output,chromosome=range(10,30),allow_missing=True)
+        expand(rules.bcftools_isec.output,chromosome=range(1,30),allow_missing=True)
     output:
         'vcfs/isec/{mode}.txt'
     shell:
         '''
         mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
+        '''
+
+
+rule sample_breakdown_variants:
+    input:
+        SVs = expand('vcfs/{{pangenome}}/{chromosome}.SV.vcf',chromosome=range(1,30)),
+        small = expand('vcfs/{{pangenome}}/{chromosome}.small.vcf.gz',chromosome=range(1,30))
+    output:
+        'vcfs/{pangenome}/per_sample.csv'
+    params:
+        tmp_small = '$TMPDIR/small.vcf.gz'
+    shell:
+        '''
+        bcftools concat {input.SVs} | bcftools stats -s- | awk '$1=="PSC" {{ print "SV",$3,$13 }}' > {output}
+        bcftools concat --naive-force -o {params.tmp_small} {input.small}
+        bcftools view -i 'TYPE="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "SNP",$3,$13 }}' >> {output}
+        bcftools view -i 'TYPE!="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "Indel",$3,$13 }}' >> {output}
         '''
