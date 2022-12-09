@@ -79,7 +79,7 @@ rule graphaligner:
     threads: 4#lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
-        walltime = '4:00'
+        walltime = '24:00'
     shell:
         '''
         if [ -s {input.fasta} ]; then
@@ -103,12 +103,30 @@ rule bin_edit_distance:
 localrules: gather_edit
 rule gather_edit:
     input:
-        rules.bin_edit_distance.output[0]
+        expand(rules.bin_edit_distance.output[0],chromosome=range(1,30),pangenome=('minigraph','cactus','pggb'),sample=pangenome_samples,preset=('lenient',),trimmed=('trimmed','untrimmed'))
     output:
-        'edit_distance/{sample}.{chromosome}.{pangenome}.{preset,strict|lenient}.{trimmed}.stat'
+        'edit_distance/summary.tsv'
+        #'edit_distance/{sample}.{chromosome}.{pangenome}.{preset,strict|lenient}.{trimmed}.stat'
+    params:
+        samples = list(pangenome_samples.keys())
     shell:
         '''
-        awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L/M,M/D,L,M,D}}' {input} > {output}
-        '''
-
-#for p in minigraph cactus; do for i in {1..29}; do for j in Angus Bison Brahman BSW Gaur Highland Nellore OBV Pied Simmental UCD Yak; do for k in trimmed untrimmed; do echo $p $j $i $k $(awk '{{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/${j}.${i}.${p}.lenient.${k}.dist); done;done;done;done > big.csv
+        echo "pangenome breed chromosome region matched aligned seeded size memory CPU errors" > {output}
+for p in minigraph cactus pggb
+do
+  for c in {{1..29}}
+   do
+     for b in {params.samples}
+     do
+       for T in trimmed untrimmed
+       do
+         echo -n "$p $b $c $T $(awk 'BEGIN {{L=-1;M=-1;D=-1}} {{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/$b.$c.$p.lenient.$T.dist) "
+         echo $(awk -v c=0 '!/>/ {{c+=length($1)}} END {{print c}}' edit_distance/$b.$c.chunks.$T.fasta) \
+         $(awk '/Max Memory/ {{print $4}}' logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*out) \
+         $(awk '/CPU/ {{print $4}}' logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*out) \
+         $(grep -hcF Seed logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*err)
+      done
+    done
+  done
+done >> {output}
+'''
