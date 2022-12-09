@@ -47,7 +47,7 @@ rule jasmine:
         vcfs = lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group)),
         reference = expand('assemblies/{{chromosome}}/{ref_ID}.fa',ref_ID=get_reference_ID())
     output:
-        'vcfs/jasmine/{chromosome}.{_group}.{setting}.vcf'
+        'vcfs/jasmine/{chromosome}.{_group,calls}.{setting,lenient}.vcf'
     params:
         _input = lambda wildcards, input: ','.join(input.vcfs),
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]
@@ -71,21 +71,23 @@ rule stratify_jasmine_repeats:
         vcf = rules.jasmine.output,
         repeats = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True)
     output:
-        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.non_repetitive.vcf',
-        repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitivevcf'
+        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group,calls}.{setting}.non_repetitive.vcf',
+        repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf'
     resources:
         walltime = '10'
+    params:
+        overlap = 0.75
     shell:
         '''
-        bedtools subtract -A -a {input.vcf} -b {input.repeats} > {output.non_repetitive}
-        bedtools intersect -u -a {input.vcf} -b {input.repeats} > {output.repetitive}
+        bedtools subtract -A -f {params.overlap} -a {input.vcf} -b {input.repeats} > {output.non_repetitive}
+        bedtools intersect -u -f {params.overlap} -a {input.vcf} -b {input.repeats} > {output.repetitive}
         '''
 
 localrules: summarise_jasmine
 rule summarise_jasmine:
     input:
-        non_repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.non_reptitive.vcf',chromosome=range(1,30),allow_missing=True),
-        repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.reptitive.vcf',chromosome=range(1,30),allow_missing=True)
+        non_repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.non_repetitive.vcf',chromosome=range(1,30),allow_missing=True),
+        repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf',chromosome=range(1,30),allow_missing=True)
     output:
         'vcfs/jasmine/{_group}.{setting}.stat'
     shell:
@@ -126,11 +128,23 @@ rule sample_breakdown_variants:
     output:
         'vcfs/{pangenome}/per_sample.csv'
     params:
-        tmp_small = '$TMPDIR/small.vcf.gz'
+        tmp_small = '$TMPDIR/small.vcf.gz',
+        key = lambda wildcards: '$13' if wildcards.pangenome != 'assembly' else '$9'
     shell:
         '''
-        bcftools concat {input.SVs} | bcftools stats -s- | awk '$1=="PSC" {{ print "SV",$3,$13 }}' > {output}
+        bcftools concat {input.SVs} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SV",$3,{params.key} }}' > {output}
         bcftools concat --naive-force -o {params.tmp_small} {input.small}
-        bcftools view -i 'TYPE="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "SNP",$3,$13 }}' >> {output}
-        bcftools view -i 'TYPE!="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "Indel",$3,$13 }}' >> {output}
+        bcftools view -i 'TYPE="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SNP",$3,{params.key} }}' >> {output}
+        bcftools view -i 'TYPE!="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","Indel",$3,{params.key} }}' >> {output}
+        '''
+
+localrules: gather_sample_breakdown
+rule gather_sample_breakdown:
+    input:
+        expand('vcfs/{pangenome}/per_sample.csv',pangenome=('minigraph','pggb','cactus','assembly'))
+    output:
+        'vcfs/per_sample.csv'
+    shell:
+        '''
+        cat {input} > {output}
         '''
