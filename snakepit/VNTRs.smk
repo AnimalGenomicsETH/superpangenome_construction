@@ -1,7 +1,3 @@
-pangenome_samples = config['pangenome_samples']
-def get_reference_ID():
-    return 'HER'
-
 rule repeatmasker_to_bed:
     input:
         'assemblies/{chromosome}/{sample}.fa.out'
@@ -57,7 +53,7 @@ rule odgi_position:
         'VNTRs/{pangenome,pggb|cactus}/{chromosome}.liftover.bed'
     threads: 2
     resources:
-        mem_mb = 2500,
+        mem_mb = 4000,
         walltime = '4:00'
     shell:
         '''        
@@ -76,7 +72,7 @@ rule gfatools_bubble:
         gfatools bubble {input.gfa} | cut -f -3,12 |\
         bedtools intersect -f 0.0000000001 -wo -b - -a {input.TRs} |\
         bedtools merge -c 4,8 -o distinct,collapse |\
-        python {workflow.basedir}/minigraph_VNTR_conversion.py {input.beds} > {output}
+        python {workflow.basedir}/snakepit/minigraph_VNTR_conversion.py {input.beds} > {output}
         '''
 
 import regex
