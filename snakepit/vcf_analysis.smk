@@ -129,13 +129,13 @@ rule sample_breakdown_variants:
         'vcfs/{pangenome}/per_sample.csv'
     params:
         tmp_small = '$TMPDIR/small.vcf.gz',
-        key = lambda wildcards: '$13' if wildcards.pangenome != 'assembly' else '$9'
+        key = lambda wildcards: ('$13','$13') if wildcards.pangenome != 'assembly' else ('$9','$5')
     shell:
         '''
-        bcftools concat {input.SVs} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SV",$3,{params.key} }}' > {output}
+        bcftools concat {input.SVs} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SV",$3,{params.key[0]} }}' > {output}
         bcftools concat --naive-force -o {params.tmp_small} {input.small}
-        bcftools view -i 'TYPE="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SNP",$3,{params.key} }}' >> {output}
-        bcftools view -i 'TYPE!="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","Indel",$3,{params.key} }}' >> {output}
+        bcftools view -i 'TYPE="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","SNP",$3,{params.key[1]} }}' >> {output}
+        bcftools view -i 'TYPE!="snp"' {params.tmp_small} | bcftools stats -s- | awk '$1=="PSC" {{ print "{wildcards.pangenome}","Indel",$3,{params.key[0]} }}' >> {output}
         '''
 
 localrules: gather_sample_breakdown

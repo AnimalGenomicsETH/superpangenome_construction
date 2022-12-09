@@ -39,7 +39,7 @@ rule repeatmasker_soft:
     threads: 8
     resources:
         mem_mb = 1000,
-        walltime = '24:00'
+        walltime = '4:00'
     shell:
         '''
         RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
