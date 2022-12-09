@@ -64,9 +64,9 @@ def get_memory(wildcards,input):
     if input.size_mb == 0:
         return 100
     if wildcards.trimmed == 'trimmed':
-        return 40000
+        return 20000
     else:
-        return 35000
+        return 25000
 
 rule graphaligner:
     input:
@@ -79,7 +79,7 @@ rule graphaligner:
     threads: 4#lambda wildcards,input: get_threads(wildcards,input)
     resources:
         mem_mb = lambda wildcards,input: get_memory(wildcards,input),
-        walltime = '24:00'
+        walltime = '4:00'
     shell:
         '''
         if [ -s {input.fasta} ]; then
@@ -103,12 +103,11 @@ rule bin_edit_distance:
 localrules: gather_edit
 rule gather_edit:
     input:
-        expand(rules.bin_edit_distance.output[0],chromosome=range(1,30),pangenome=('minigraph','cactus','pggb'),sample=pangenome_samples,preset=('lenient',),trimmed=('trimmed','untrimmed'))
+        expand(rules.bin_edit_distance.output[0],chromosome=range(1,30),pangenome=('minigraph','cactus','pggb'),sample=all_samples,preset=('lenient',),trimmed=('trimmed','untrimmed'))
     output:
         'edit_distance/summary.tsv'
-        #'edit_distance/{sample}.{chromosome}.{pangenome}.{preset,strict|lenient}.{trimmed}.stat'
     params:
-        samples = list(pangenome_samples.keys())
+        samples = all_samples
     shell:
         '''
         echo "pangenome breed chromosome region matched aligned seeded size memory CPU errors" > {output}
@@ -121,10 +120,11 @@ do
        for T in trimmed untrimmed
        do
          echo -n "$p $b $c $T $(awk 'BEGIN {{L=-1;M=-1;D=-1}} {{split($1,a,":");split(a[2],b,"-"); D+=(b[2]-b[1]);L+=$2;M+=$3}} END {{print L,M,D}}' edit_distance/$b.$c.$p.lenient.$T.dist) "
-         echo $(awk -v c=0 '!/>/ {{c+=length($1)}} END {{print c}}' edit_distance/$b.$c.chunks.$T.fasta) \
-         $(awk '/Max Memory/ {{print $4}}' logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*out) \
-         $(awk '/CPU/ {{print $4}}' logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*out) \
-         $(grep -hcF Seed logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_*err)
+         LOG=$(grep -l "Successfully" logs/graphaligner/sample-$b.chromosome-$c.pangenome-$p.preset-lenient.trimmed-${{T}}_202212*out | tail -n 1)
+         ERR=${{LOG%.out}}.err
+         echo $(awk 'BEGIN {{ c=0 }} !/>/ {{c+=length($1)}} END {{print c}}' edit_distance/$b.$c.chunks.$T.fasta) \
+         $(awk '/Max Memory|CPU/ {{ A[$2]=$4 }} END {{ print A["Memory"],A["time"] }}' $LOG) \
+         $(grep -hcF "Seed" $ERR)
       done
     done
   done
