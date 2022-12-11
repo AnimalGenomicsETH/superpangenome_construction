@@ -136,6 +136,19 @@ rule process_VNTRs:
                         if result:
                             print(result,file=fout)
 
+localrules: gather_VNTRs
+rule gather_VNTRs:
+    input:
+        expand(rules.process_VNTRs.output,chromosome=range(1,30),allow_missing=True)
+    output:
+        'VNTRs/{pangenome}/VNTR.counts'
+    params:
+        header = ','.join(['chromosome','start','end','TR','valid',] + list(pangenome_samples.keys()))
+    shell:
+        '''
+        {{ echo {params.header} ; sed '/chromosome/d' {input} | sort -t',' -k1,1n -k2,2n ; }} > {output}
+        '''
+
 rule advntr_model:
     input:
         'VNTR_LR_genotyping/testable_VNTRs.txt'
