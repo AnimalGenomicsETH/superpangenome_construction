@@ -47,7 +47,7 @@ rule jasmine:
         vcfs = lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group)),
         reference = expand('assemblies/{{chromosome}}/{ref_ID}.fa',ref_ID=get_reference_ID())
     output:
-        'vcfs/jasmine/{chromosome}.{_group,calls}.{setting,lenient}.vcf'
+        'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting,lenient|optical}.vcf'
     params:
         _input = lambda wildcards, input: ','.join(input.vcfs),
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]
@@ -62,7 +62,7 @@ rule jasmine:
         '''
         java -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
         --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
-        genome_file={input.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type \
+        genome_file={input.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type min_support=2\
         {params.settings}
         '''
 
@@ -71,7 +71,7 @@ rule stratify_jasmine_repeats:
         vcf = rules.jasmine.output,
         repeats = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True)
     output:
-        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group,calls}.{setting}.non_repetitive.vcf',
+        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting}.non_repetitive.vcf',
         repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf'
     resources:
         walltime = '10'
@@ -79,8 +79,10 @@ rule stratify_jasmine_repeats:
         overlap = 0.75
     shell:
         '''
-        bedtools subtract -A -f {params.overlap} -a {input.vcf} -b {input.repeats} > {output.non_repetitive}
-        bedtools intersect -u -f {params.overlap} -a {input.vcf} -b {input.repeats} > {output.repetitive}
+        grep -v "SUPP_VEC=00001" {input.vcf} |\
+        bedtools subtract -A -f {params.overlap} -a - -b {input.repeats} > {output.non_repetitive}
+        grep -v "SUPP_VEC=00001" {input.vcf} |\
+        bedtools intersect -u -f {params.overlap} -a - -b {input.repeats} > {output.repetitive}
         '''
 
 localrules: summarise_jasmine
@@ -146,5 +148,83 @@ rule gather_sample_breakdown:
         'vcfs/per_sample.csv'
     shell:
         '''
-        cat {input} > {output}
+        echo "pangenome variant sample count" > {output}
+        cat {input} >> {output}
+        '''
+
+localrules: AF_breakdown
+rule AF_breakdown:
+    input:
+        SVs = expand('vcfs/{{pangenome}}/{chromosome}.SV.vcf',chromosome=range(1,30))
+    output:
+        'vcfs/{pangenome}/AFs.csv'
+    shell:
+        '''
+        bcftools concat {input} | bcftools query -f '%AC\n' | mawk '{{ A[$1]+=1 }} END {{ for (key in A) {{ print "{wildcards.pangenome}",key,A[key] }} }}' > {output}
+        '''
+
+localrules: gather_AF
+rule gather_AF:
+    input:
+        expand('vcfs/{pangenome}/AFs.csv',pangenome=('minigraph','pggb','cactus','assembly'))
+    output:
+        'vcfs/AFs.csv'
+    shell:
+        '''
+        echo "pangenome AF count" > {output}
+        cat {input} >> {output}
+        '''
+
+localrules: SV_breakdown
+rule SV_breakdown:
+    input:
+        expand('vcfs/{pangenome}/{chromosome}.SV.vcf',chromosome=range(1,30),pangenome=('minigraph','cactus','pggb','assembly'))
+    output:
+        'vcfs/SV_breakdown.csv'
+    shell:
+        '''
+        echo "pangenome chromosome deletions insertions other" > {output}
+        for p in pggb cactus minigraph assembly
+        do
+          for c in {{1..29}}
+          do
+            echo -n "$p $c "
+            echo $(bcftools stats vcfs/$p/$c.SV.vcf |\
+            awk ' {{ if ($5~/others/) {{ O+=$6 }} else {{ if ($1=="IDD") {{ if ($3~/-/) {{ D+=$4 }} else {{ I+=$4 }} }} }} }} END {{ print D,I,O}} ')
+          done
+        done >> {output}
+'''
+
+rule path_conflicts:
+    input:
+        expand('vcfs/{pangenome}/{chromosome}.raw.vcf',chromosome=range(1,30),allow_missing=True)
+    output:
+        'vcfs/{pangenome}/conflicts.txt'
+    params:
+        samples = list(pangenome_samples.keys()),
+        vcf = '$TMPDIR/concat.vcf'
+    shell:
+        '''
+        if [ {wildcards.pangenome} = "minigraph" ]
+        then
+          for i in {params.samples}; do echo "minigraph SV" $i  $(grep -h "\." graphs/minigraph/*.$i.bed | wc -l) $(cat graphs/minigraph/*.$i.bed | wc -l); done > {output}
+        else
+          bcftools concat -o $TMPDIR/concat.vcf {input}
+          bcftools view -H -i 'abs(ILEN)>=50' -o $TMPDIR/SV.vcf {params.vcf}
+          grep -hoP "CONFLICT=\K[A-Z,]+" $TMPDIR/SV.vcf | tr ',' '\\n' | mawk -v T=$(wc -l $TMPDIR/SV.vcf | cut -d' ' -f 1) '{{ A[$1]+=1 }} END {{ for (key in A) {{ print "{wildcards.pangenome}","SV",key,A[key],T }} }}' > {output}
+          bcftools view -H -e 'abs(ILEN)>=50' -o $TMPDIR/small.vcf {params.vcf} 
+          grep -hoP "CONFLICT=\K[A-Z,]+" $TMPDIR/small.vcf | tr ',' '\\n' | mawk -v T=$(wc -l $TMPDIR/small.vcf | cut -d' ' -f 1) '{{ A[$1]+=1 }} END {{ for (key in A) {{ print "{wildcards.pangenome}","small",key,A[key],T }} }}' >> {output}
+        fi
+        '''
+
+localrules: gather_conflicts
+rule gather_conflicts:
+    input:
+        expand('vcfs/{pangenomes}/conflicts.txt',pangenomes=('pggb','cactus','minigraph'))
+    output:
+        'vcfs/conflicts.txt'
+    shell:
+        '''
+        echo "pangenome variant sample count total" > {output}
+        cat {input} >> {output}
         '''
