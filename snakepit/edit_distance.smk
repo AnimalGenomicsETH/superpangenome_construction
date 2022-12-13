@@ -64,9 +64,9 @@ def get_memory(wildcards,input):
     if input.size_mb == 0:
         return 100
     if wildcards.trimmed == 'trimmed':
-        return 20000
+        return 50000
     else:
-        return 25000
+        return 30000
 
 rule graphaligner:
     input:

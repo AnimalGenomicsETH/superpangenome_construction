@@ -53,16 +53,16 @@ rule jasmine:
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]
     conda:
         'jasmine'
-    threads: 4
+    threads: 1
     resources:
-        mem_mb= 5000,
+        mem_mb= 10000,
         walltime= '4:00',
         scratch = '5G'
     shell:
         '''
-        java -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
+        java -Xmx6048m -jar /cluster/work/pausch/alex/software/Jasmine/jasmine.jar \
         --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
-        genome_file={input.reference} --pre_normalize --dup_to_ins --ignore_strand --allow_intrasample --normalize_type min_support=2\
+        genome_file={input.reference} --pre_normalize --ignore_strand --allow_intrasample --normalize_type \
         {params.settings}
         '''
 
@@ -76,7 +76,7 @@ rule stratify_jasmine_repeats:
     resources:
         walltime = '10'
     params:
-        overlap = 0.75
+        overlap = 0.5
     shell:
         '''
         grep -v "SUPP_VEC=00001" {input.vcf} |\

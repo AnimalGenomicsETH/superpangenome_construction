@@ -149,6 +149,22 @@ rule gather_VNTRs:
         {{ echo {params.header} ; sed '/chromosome/d' {input} | sort -t',' -k1,1n -k2,2n ; }} > {output}
         '''
 
+
+#localrules: summarise_VNTRs
+#rules summarise_VNTRs:
+#    input:
+#        ''
+#    output:
+#        ''
+#    shell:
+#        '''
+#        for P in pggb cactus
+#        do
+#          echo $(awk '/Max Memory|CPU/ {{ A[$2]=$4 }} END {{ print A["Memory"],A["time"] }}' logs/odgi_position/pangenome-$P.*out)
+#        done
+#        echo $(awk '/Max Memory|CPU/ {{ A[$2]=$4 }} END {{ print A["Memory"],A["time"] }}' logs/gfatools_bubble/*out)
+#        '''
+
 rule advntr_model:
     input:
         'VNTR_LR_genotyping/testable_VNTRs.txt'
