@@ -1,4 +1,4 @@
-#include: 'utility.py'
+include: 'utility.py'
 
 def get_variants(_group):
     match _group:
@@ -26,7 +26,7 @@ rule prepare_optical_maps:
     shell:
         '''
         wget -O {output.all} {params.URL}
-        bcftools view --threads {threads} -s {params.samples} -i '(ALT="<DEL>"||ALT="<INS>"||ALT="<DUP>")&&ABS(INFO/SVLEN)<1000000' {output.all} | bcftools norm -d none | bcftools +scatter -o {params._dir} -s {params.chromosomes}
+        bcftools view --threads {threads} -s {params.samples} -c 1 -i '(ALT="<DEL>"||ALT="<INS>"||ALT="<DUP>")&&ABS(INFO/SVLEN)<1000000' {output.all} | bcftools norm -d none | bcftools annotate -x ^INFO/SVLEN,^INFO/SVTYPE,^FORMAT/GT | bcftools +scatter -o {params._dir} -s {params.chromosomes}
         '''
 
 localrules: rename_optical_chromosomes
@@ -47,7 +47,7 @@ rule jasmine:
         vcfs = lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group)),
         reference = expand('assemblies/{{chromosome}}/{ref_ID}.fa',ref_ID=get_reference_ID())
     output:
-        'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting,lenient|optical}.vcf'
+        'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting,lenient|optical|strict}.vcf'
     params:
         _input = lambda wildcards, input: ','.join(input.vcfs),
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]
