@@ -1,13 +1,5 @@
 
-pangenome_samples = config['pangenome_samples']
-
-wildcard_constraints:
-    chromosome = r'\d+',
-    pangenome = r'pggb|cactus|minigraph|assembly'
-
-
 ##normalise direction of contigs
-
 #rule download_fasta:
 #    output:
 #        expand('raw_assemblies/{sample}.fasta',sample=config['pangenome_samples'])
