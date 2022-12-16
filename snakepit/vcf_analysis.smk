@@ -119,7 +119,7 @@ rule count_isec_overlaps:
         'vcfs/isec/{mode}.txt'
     shell:
         '''
-        mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{INDEL[$5]+=1}} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} }}' {input} > {output}
+        mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{ if ($3~/,/||$4~/,/) {{MULTI[$5]+=1}} else {{INDEL[$5]+=1}} }} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} for (key in MULTI) {{ print "MULTI",key,MULTI[key]}} }}' {input} > {output}
         '''
 
 

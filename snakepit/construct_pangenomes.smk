@@ -23,11 +23,15 @@ rule split_fasta:
 
 rule repeatmasker_soft:
     input:
-        'assemblies/{chromosome}/{sample}.fa'
+        #'assemblies/{chromosome}/{sample}.fa'
+        '{path}/{sample}.fa'
     output:
-        masked = temp('assemblies/{chromosome}/{sample}.fa.masked'),
-        out = temp('assemblies/{chromosome}/{sample}.fa.out'),
-        cat = temp('assemblies/{chromosome}/{sample}.fa.cat.gz')
+        masked = temp('{path}/{sample}.fa.masked'),
+        out = temp('{path}/{sample}.fa.out'),
+        cat = temp('{path}/{sample}.fa.cat.gz'),
+        #masked = temp('assemblies/{chromosome}/{sample}.fa.masked'),
+        #out = temp('assemblies/{chromosome}/{sample}.fa.out'),
+        #cat = temp('assemblies/{chromosome}/{sample}.fa.cat.gz')
     threads: 8
     resources:
         mem_mb = 1000,
@@ -264,3 +268,17 @@ rule summarise_gfa_stats:
         '''
         awk '{{ if ($1~/(length|edges|steps|file_size_in_bytes)/)  {{ A[$1]+=$2 }} else {{ if ($1~/nodes/&&A["nodes:"]==0) {{ A[$1]+=$2 }} }} }}  END {{ for (key in A) {{ print key,A[key] }} }}' {input} > {output}
         '''
+
+rule odgi_flatten:
+    input:
+        'graphs/{pangenome}/{chromosome}.gfa'
+    output:
+        fasta = 'graphs/{pangenome}/{chromosome}.fa',
+        bed = 'graphs/{pangenome}/{chromosome}.bed'
+    resources:
+        mem_mb = 5000
+    shell:
+        '''
+        odgi flatten -i {input} -f {output.fasta} -b {output.bed}
+        '''
+

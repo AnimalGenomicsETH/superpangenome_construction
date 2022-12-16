@@ -48,8 +48,8 @@ rule bcftools_norm:
         '''
         bcftools norm --threads {threads} -m -any -f {input.reference} {input.vcf} |\
         bcftools norm --threads {threads} -d none |\
-        bcftools view -c 1 |\
         bcftools sort -T $TMPDIR -o {output}
+        #abcftools view -c 0 |\
         '''
 
 #TODO probably want small vcf as gz for isec
