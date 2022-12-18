@@ -2,8 +2,8 @@ pangenome_samples:
   ANG: 'asm5'
   BIS: 'asm20'
   BRA: 'asm10'
-  BSW: 'asm20'
-  GAU: 'asm5'
+  BSW: 'asm5'
+  GAU: 'asm20'
   HER: 'reference'
   HIG: 'asm5'
   NEL: 'asm10'
@@ -13,24 +13,45 @@ pangenome_samples:
   YAK: 'asm20'
 
 additional_samples:
- Od1: 'a'
+  - OS1
+  - OS2
+  - OD1
+  - OD2
+  - B11
+  - B12
+  - B21
+  - B22
+
+
 ## minigraph bubble size
-L: 50
-divergence: 0.02
+minigraph:
+  L: 50
+  divergence: 0.02
+
+pggb:
+  divergence: 98
+  segment_length: 100000
+  container: '/cluster/work/pausch/alex/software/images/pggb_20221128155756b3886f.sif'
+
+cactus:
+  container: '/cluster/work/pausch/alex/software/images/cactus_v2.3.0.sif'
 
 ## vcf deconstruction
-skip_size: 100000
+skip_size: 1000000
 
+TR_divergence_limit: 0.25
+timeout: 150
 
 repeat_library: '/cluster/work/pausch/alex/REF_DATA/Repeat_libraries/BosTau9_repeat_library.fasta'
 
 optical_map_URL: 'https://zenodo.org/record/6854879/files/Merged_minQ20_maxDist1000.vcf.gz'
 
 graphaligner_parameters:
+  window: 500000
   strict: '-x vg'
-  lenient: '-x dbg -C 750000 --max-trace-count 5  --precise-clipping 0.9 --seeds-minimizer-ignore-frequent 0.001'
+  lenient: '-x dbg -C 1000000 --max-trace-count 5  --precise-clipping 0.9 --seeds-minimizer-ignore-frequent 0.001'
 
 intersection_parameters:
   strict: 'max_dist=25'
-  lenient: 'max_dist_linear=1 max_dist=1000'
-  optical: 'max_dist_linear=1 max_dist=1000'
+  lenient: 'max_dist_linear=0.5 max_dist=1000'
+  optical: 'max_dist_linear=1'
