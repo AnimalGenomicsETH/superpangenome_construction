@@ -29,13 +29,14 @@ rule repeatmasker_soft:
         masked = temp('{path}/{sample}.fa.masked'),
         out = temp('{path}/{sample}.fa.out'),
         cat = temp('{path}/{sample}.fa.cat.gz'),
+        tbl = temp('{path}/{sample}.fa.tbl'),
         #masked = temp('assemblies/{chromosome}/{sample}.fa.masked'),
         #out = temp('assemblies/{chromosome}/{sample}.fa.out'),
         #cat = temp('assemblies/{chromosome}/{sample}.fa.cat.gz')
     threads: 8
     resources:
         mem_mb = 1000,
-        walltime = '4:00'
+        walltime = '24:00'
     shell:
         '''
         RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
@@ -53,7 +54,7 @@ rule mash_triangle:
         walltime = '4:00'
     shell:
         '''
-        mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' {output}
+        mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' > {output}
         '''
 
 import numpy as np
@@ -276,9 +277,30 @@ rule odgi_flatten:
         fasta = 'graphs/{pangenome}/{chromosome}.fa',
         bed = 'graphs/{pangenome}/{chromosome}.bed'
     resources:
-        mem_mb = 5000
+        mem_mb = 7500
     shell:
         '''
         odgi flatten -i {input} -f {output.fasta} -b {output.bed}
         '''
 
+localrules: repeat_summary
+rule repeat_summary:
+    input:
+        expand('graphs/{pangenome}/{chromosome}.fa.tbl',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30))
+    output:
+        'graphs/repeats.csv'
+    params:
+        samples = lambda wildcards: '{' +','.join(list(pangenome_samples.keys())) +'}'
+    shell:
+        '''
+        echo -e "pangenome\\tchromosome\\tSatellite\\tLTR\\tSINE\\tMasked\\tLINE\\tTotal" > {output}
+        for i in {input}
+        do
+          mawk '/total|masked|SINE|LINE|Retroviral|Satellites/ {{ A[$1]+=$3 }} END {{ var=FILENAME; split (var,a,"/"); split(a[3],b,"."); printf a[2]"\\t"b[1]"\\t"; for (key in A) {{printf A[key]"\\t" }} {{printf "\\n"}} }}' $i >> {output}
+        done
+        for j in {{1..29}}
+        do
+          mawk -v C=$j '/total|masked|SINE|LINE|Retroviral|Satellites/ {{ A[$1]+=$3 }} END {{ printf "ASM\\t"C"\\t"; for (key in A) {{printf A[key]"\\t" }} {{printf "\\n"}} }}' assemblies/${{j}}/{params.samples}.fa.tbl >> {output}
+          mawk -v C=$j '/total|masked|SINE|LINE|Retroviral|Satellites/ {{ A[$1]+=$3 }} END {{ printf "REF\\t"C"\\t"; for (key in A) {{printf A[key]"\\t" }} {{printf "\\n"}} }}' assemblies/${{j}}/HER.fa.tbl >> {output}
+        done
+        '''
