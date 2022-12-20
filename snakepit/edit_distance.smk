@@ -43,8 +43,6 @@ rule seperate_centro_telo_regions:
             temp.seek(0)
             subprocess.run(f'samtools faidx -r {temp.name} {input.fasta} > {output.trimmed}',shell=True)
 
-        #with open(output[0],'w') as fout:
-        #    fout.write(f'{wildcards.sample},{wildcards.chromosome},{start-1},{end-start-1},{params.chr_size-end}')
 
 def get_threads(wildcards,input):
     if input.size_mb == 0:
@@ -71,7 +69,7 @@ def get_memory(wildcards,input):
 rule graphaligner:
     input:
         gfa = 'graphs/{pangenome}/{chromosome}.gfa',
-        fasta = lambda wildcards: 'edit_distance/{sample}.{chromosome}.chunks.{trimmed}.fasta'
+        fasta ='edit_distance/{sample}.{chromosome}.chunks.{trimmed}.fasta'
     output:
         temp('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.gaf')
     params:
@@ -130,3 +128,30 @@ do
   done
 done >> {output}
 '''
+
+rule gather_regions:
+    input:
+        expand('edit_distance/{sample}.{chromosome}.chunks.{trimmed}.fasta',sample=all_samples,chromosome=range(1,30),trimmed=('trimmed','untrimmed'))
+    output:
+        'edit_distance/assembly_stats.csv'
+    params:
+        samples = all_samples
+    shell:
+        '''
+        echo -e "sample chromosome region bases" > {output}
+for c in {{1..29}}
+do
+  for s in {params.samples}
+  do
+    for t in trimmed untrimmed
+    do
+      if [ -s edit_distance/$s.$c.chunks.$t.fasta ]
+      then
+        calN50.js edit_distance/$s.$c.chunks.$t.fasta | awk -v C=$c -v S=$s -v T=$t '$1=="SZ" {{print S,C,T,$2}} ' >> {output}
+      else
+        awk -v C=$c -v S=$s -v T=$t '{{print S,C,T,0}} ' >> {output}
+      fi
+    done
+  done
+done
+       '''
