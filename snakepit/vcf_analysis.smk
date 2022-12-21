@@ -47,7 +47,7 @@ rule jasmine:
         vcfs = lambda wildcards: expand('vcfs/{pangenome}/{{chromosome}}.SV.vcf',pangenome=get_variants(wildcards._group)),
         reference = expand('assemblies/{{chromosome}}/{ref_ID}.fa',ref_ID=get_reference_ID())
     output:
-        'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting,lenient|optical|strict}.vcf'
+        'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting,lenient|optical|strict|strictest|lenientest|stricter}.vcf'
     params:
         _input = lambda wildcards, input: ','.join(input.vcfs),
         settings = lambda wildcards: config['intersection_parameters'][wildcards.setting]

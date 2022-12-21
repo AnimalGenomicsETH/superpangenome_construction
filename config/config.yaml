@@ -52,6 +52,9 @@ graphaligner_parameters:
   lenient: '-x dbg -C 1000000 --max-trace-count 5  --precise-clipping 0.9 --seeds-minimizer-ignore-frequent 0.001'
 
 intersection_parameters:
-  strict: 'max_dist=25'
+  strict: 'max_dist=10 max_dist_linear=.5 min_seq_id=0.5'
+  stricter: 'max_dist=5 max_dist_linear=.1 min_seq_id=0.5'
+  strictest: 'max_dist=1 max_dist_linear=0 min_seq_id=0.85'
   lenient: 'max_dist_linear=0.5 max_dist=1000'
+  lenientest: 'max_dist_linear=1 max_dist=10000'
   optical: 'max_dist_linear=1'

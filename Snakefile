@@ -5,7 +5,9 @@ from pathlib import Path,PurePath
 
 pangenome_samples = config['pangenome_samples']
 additional_samples = config['additional_samples']
-all_samples = list(pangenome_samples.keys()) + list(additional_samples)
+config['all_samples'] = list(pangenome_samples.keys()) + list(additional_samples)
+all_samples = config['all_samples']
+
 wildcard_constraints:
     chromosome = r'\d+',
     pangenome = r'pggb|cactus|minigraph|assembly|miniwaf'
