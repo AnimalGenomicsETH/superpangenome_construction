@@ -4,18 +4,17 @@ This work focuses on comparing pangenome constructions methods for the downstrea
 
 This reposistory is currently a work-in-progress as code is centralised and cleaned up.
 
-### Components
+## Components
 
-This project attempts to compare multiple pangenome graph construction.     
-
-Consists of two experiment (in the respective folder):
-
-- Simulated     
-Assessing the pangenome graph performance from ground-truth simulated structural variations. 
-
-- Real      
-Assessing the graph performance from real data from graph statistics and (long and short-reads) mapping performance. 
-
+This project involves multiple steps. We first
+- construct pangenomes from 12 bovine assemblies with
+  - minigraph
+  - pggb
+  - cactus
+- decompose pangenomes into vcf
+- compare vcf files for accuracy to assembly-called _truth_
+- assess applications to new topics like VNTRs.
 
 
-
+### Citation
+The preprint associated with this work can be found [here](https://www.biorxiv.org/content/10.1101/2022.09.17.508368v1.full.pdf).
