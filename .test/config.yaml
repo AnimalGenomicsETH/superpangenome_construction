@@ -2,10 +2,11 @@ pangenome_samples:
   A: 'asm5'
   B: 'asm20'
   C: 'asm10'
+  D: 'reference'
 
 additional_samples:
-  - D
   - E
+  - F
 
 
 ## minigraph bubble size
