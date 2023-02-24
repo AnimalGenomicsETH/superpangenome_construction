@@ -43,6 +43,25 @@ rule repeatmasker_soft:
         -lib {config[repeat_library]} {input}
         '''
 
+rule mash_dist:
+    input: 
+        expand('assemblies/{chromosome}/{sample}.fa',chromosome=range(1,30),sample=config['pangenome_samples'])
+    output:
+        'communities'
+    shell:
+        '''
+        cat {input} | bgzip -@ {threads} -c > $TMPDIR/genomes.fa.gz
+        samtools faidx $TMPDIR/genomes.fa.gz
+        mash dist -p 12 -s 5000 -i $TMPDIR/genomes.fa.gz $TMPDIR/genomes.fa.gz > bovinae.distances.tsv
+        python paf2net.py -m bovinae.distances.tsv
+        python net2communities.py -e bovinae.distances.tsv.edges.list.txt -w bovinae.distances.tsv.edges.weights.txt -n bovinae.distances.tsv.vertices.id2name.txt
+        for i in {{0..29}}
+          do
+          chromosomes=$(cat bovinae.distances.tsv.edges.weights.txt.community.$i.txt | cut -f 3 -d '#' | sort | uniq | tr '\n' ' '
+          echo "community $i --> $chromosomes"
+        done
+        '''
+
 rule mash_triangle:
     input:
         lambda wildcards: expand('raw_assemblies/{sample}.fasta',sample=config[wildcards.sample_set])
