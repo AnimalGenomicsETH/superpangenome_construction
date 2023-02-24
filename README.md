@@ -17,4 +17,4 @@ This project involves multiple steps. We first
 
 
 ### Citation
-The preprint associated with this work can be found [here](https://www.biorxiv.org/content/10.1101/2022.09.17.508368v1.full.pdf).
+The preprint associated with this work can be found [here](https://www.biorxiv.org/content/10.1101/2022.09.17.508368).
