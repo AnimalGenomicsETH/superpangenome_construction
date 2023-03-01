@@ -84,6 +84,8 @@ def extract_fasta(regions,chromosome,TR_length):
     offset = TR_length * 10
     for region in regions:
         sample, start, stop, orientation = punctuation.findall(region)
+        print(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{int(start)-offset}-{int(stop)+offset} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}')
+        print(subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{int(start)-offset}-{int(stop)+offset} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n"))
         sequences[sample] = subprocess.run(f'samtools faidx assemblies/{chromosome}/{sample}.fa {sample}:{int(start)-offset}-{int(stop)+offset} | seqtk seq -U -l 0 {"-r" if orientation=="-" else ""}',shell=True,capture_output=True).stdout.decode("utf-8").split("\n")[1]
     return sequences
 
@@ -107,6 +109,20 @@ def process_VNTR_line(line,chromosome,samples):
 
 from functools import partial
 from multiprocessing import Pool
+
+
+rule fake_VNTR:
+    input:
+         'VNTRs/{pangenome}/{chromosome}.liftover.bed'
+    output:
+        'VNTRs/{pangenome}/{chromosome}.VNTR.fa'
+    run:
+        with open(input[0],'r') as fin, open(output[0],'w') as fout:
+            for i,line in enumerate(fin):
+                chrom, start, end, TR, *regions = line.rstrip().split()
+                sequences = extract_fasta(regions,wildcards.chromosome,len(TR))
+                for k,v in sequences.items():
+                    fout.write(f'>{k}:{start}-{end}:{TR}\n{v}\n')
 
 rule process_VNTRs:
     input:
@@ -149,6 +165,35 @@ rule gather_VNTRs:
         {{ echo {params.header} ; sed '/chromosome/d' {input} | sort -t',' -k1,1n -k2,2n ; }} > {output}
         '''
 
+#parallel -j {threads} -k -a {input.TRs} --colsep '\\t' 'start=$(({{2}} - 1000)); end=$(({{3}} + 1000)); \
+
+rule prep_depth:
+    input:
+        'VNTRs/{pangenome}/VNTR.counts'
+    output:
+        'VNTRs/{pangenome}/VNTR.interesting.counts'
+    shell:
+        '''
+        awk -F',' 'NR>1 {{ c=0;for (i=6;i<NF;i++) c+=$i; if(c>500) {{ print $0 }} }}' {input} > {output}
+        '''
+
+
+rule VNTR_depth:
+    input:
+        #gfa = 'graphs/{pangenome}/{chromosome}.gfa',
+        TRs = 'VNTRs/{pangenome}/VNTR.interesting.counts'
+    output:
+        'VNTRs/{pangenome}/VNTR.depths'
+    threads: 8
+    resources:
+        mem_mb = 8000
+    shell:
+        '''
+        parallel -j {threads} -k -a {input.TRs} --colsep ',' 'odgi extract -i graphs/{wildcards.pangenome}/{{1}}.gfa -r HER:{{2}}-{{3}} -d 1000 -t 1 -o - |\
+                odgi sort -t 1 -i - -O -o - |\
+                odgi depth -t 1 -i - -S |\
+                tail -n 1 | cut -f 5' >> {output}
+        '''
 
 #localrules: summarise_VNTRs
 #rules summarise_VNTRs:
