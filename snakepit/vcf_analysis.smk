@@ -56,7 +56,7 @@ rule jasmine:
     threads: 1
     resources:
         mem_mb= 10000,
-        walltime= '4:00',
+        walltime= '4h',
         scratch = '5G'
     shell:
         '''
@@ -64,6 +64,29 @@ rule jasmine:
         --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
         genome_file={input.reference} --pre_normalize --ignore_strand --allow_intrasample --normalize_type \
         {params.settings}
+        '''
+
+localrules: generate_genome_annotation
+rule generate_genome_annotation:
+    input:
+        masked = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True),
+        TR = expand('VNTRs/TRF/{sample}.{chromosome}.TR.bed',sample=get_reference_ID(),allow_missing=True),
+        low_map = '/cluster/work/pausch/alex/Xena_stuff_for_now/low_mappability.75.merged25.bed',
+        fai = expand('assemblies/{chromosome}/{sample}.fa.fai',sample=get_reference_ID(),allow_missing=True)
+    output:
+        'vcfs/genome_annotation.{chromosome}.bed'
+    shell:
+        '''
+        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"Satellite" }} | bedtools merge -d 10000 -c 4 -o distinct >> {output}
+        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"Repetitive" }} ' {input.masked} >> {output}
+        awk -v OFS='\\t' '{{ print $1,$2,$3,"Tandem repeat" }} ' {input.TR} >> {output}
+        awk -v OFS='\\t' -v c={wildcards.chromosome} '$1==c {{ print "HER",$2,$3,"Low mappability"}}' {input.low_map} >> {output}
+        
+
+        bedtools sort -i {output} |\
+        bedtools complement -L -g {input.fai} -i - | awk -v OFS='\\t' ' {{ print $1,$2,$3,"Normal" }} ' >> vcfs/test.bed
+        cat {output} vcfs/test.bed |\
+        bedtools sort -i - > vcfs/final.bed
         '''
 
 rule stratify_jasmine_repeats:
@@ -74,7 +97,7 @@ rule stratify_jasmine_repeats:
         non_repetitive = 'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting}.non_repetitive.vcf',
         repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf'
     resources:
-        walltime = '10'
+        walltime = '10m'
     params:
         overlap = 0.5
     shell:
