@@ -77,15 +77,16 @@ rule generate_genome_annotation:
         'vcfs/genome_annotation.{chromosome}.bed'
     shell:
         '''
-        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"Satellite" }} | bedtools merge -d 10000 -c 4 -o distinct >> {output}
-        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"Repetitive" }} ' {input.masked} >> {output}
-        awk -v OFS='\\t' '{{ print $1,$2,$3,"Tandem repeat" }} ' {input.TR} >> {output}
-        awk -v OFS='\\t' -v c={wildcards.chromosome} '$1==c {{ print "HER",$2,$3,"Low mappability"}}' {input.low_map} >> {output}
+        awk -v OFS='\\t' '/Satellite/ {{ print $1,$2,$3,"0" }} ' {input.masked} | bedtools merge -d 10000 -c 4 -o distinct >> {output}
+        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"1" }} ' {input.masked} >> {output}
+        awk -v OFS='\\t' '{{ print $1,$2,$3,"2" }} ' {input.TR} >> {output}
+        awk -v OFS='\\t' -v c={wildcards.chromosome} '$1==c {{ print "HER",$2,$3,"3"}}' {input.low_map} >> {output}
         
 
         bedtools sort -i {output} |\
-        bedtools complement -L -g {input.fai} -i - | awk -v OFS='\\t' ' {{ print $1,$2,$3,"Normal" }} ' >> vcfs/test.bed
-        cat {output} vcfs/test.bed |\
+        bedtools merge -d 0 -c 4 -o min > vcfs/hard.bed
+        bedtools complement -L -g {input.fai} -i vcfs/hard.bed | awk -v OFS='\\t' ' {{ print $1,$2,$3,"Normal" }} ' > vcfs/test.bed
+        cat vcfs/hard.bed vcfs/test.bed |\
         bedtools sort -i - > vcfs/final.bed
         '''
 
