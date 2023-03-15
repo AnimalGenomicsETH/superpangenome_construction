@@ -64,67 +64,71 @@ rule jasmine:
         --comma_filelist file_list={params._input} threads={threads} out_file={output} out_dir=$TMPDIR \
         genome_file={input.reference} --pre_normalize --ignore_strand --allow_intrasample --normalize_type \
         {params.settings}
+
+        sed -i '20i ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="">\\n##INFO=<ID=STRANDS,Number=1,Type=String,Description=""> {output}
         '''
 
 localrules: generate_genome_annotation
 rule generate_genome_annotation:
     input:
         masked = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True),
-        TR = expand('VNTRs/TRF/{sample}.{chromosome}.TR.bed',sample=get_reference_ID(),allow_missing=True),
+        TR = expand('VNTRs/TRF/{sample}.{chromosome}.TRF',sample=get_reference_ID(),allow_missing=True),
         low_map = '/cluster/work/pausch/alex/Xena_stuff_for_now/low_mappability.75.merged25.bed',
         fai = expand('assemblies/{chromosome}/{sample}.fa.fai',sample=get_reference_ID(),allow_missing=True)
     output:
-        'vcfs/genome_annotation.{chromosome}.bed'
+        total = 'vcfs/genome_annotation.{chromosome}.bed',
+        hard = 'vcfs/genome_annotation.hard.{chromosome}.bed',
+        normal = 'vcfs/genome_annotation.normal.{chromosome}.bed',
     shell:
         '''
-        awk -v OFS='\\t' '/Satellite/ {{ print $1,$2,$3,"0" }} ' {input.masked} | bedtools merge -d 10000 -c 4 -o distinct >> {output}
-        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"1" }} ' {input.masked} >> {output}
-        awk -v OFS='\\t' '{{ print $1,$2,$3,"2" }} ' {input.TR} >> {output}
-        awk -v OFS='\\t' -v c={wildcards.chromosome} '$1==c {{ print "HER",$2,$3,"3"}}' {input.low_map} >> {output}
-        
-
-        bedtools sort -i {output} |\
-        bedtools merge -d 0 -c 4 -o min > vcfs/hard.bed
-        bedtools complement -L -g {input.fai} -i vcfs/hard.bed | awk -v OFS='\\t' ' {{ print $1,$2,$3,"Normal" }} ' > vcfs/test.bed
-        cat vcfs/hard.bed vcfs/test.bed |\
-        bedtools sort -i - > vcfs/final.bed
+        {{ awk -v OFS='\\t' '/Satellite/ {{ print $1,$2,$3,"0" }} ' {input.masked} | bedtools merge -d 10000 -c 4 -o distinct; \
+        awk -v OFS='\\t' '!/Satellite/ {{ print $1,$2,$3,"2" }} ' {input.masked}; \
+        awk -v OFS='\\t' 'NR>1 {{ print "HER",$1,$2,"1" }} ' {input.TR} | bedtools sort -i - | bedtools merge -d 0 -i - -c 4 -o first | bedtools slop -g {input.fai} -i - -b 0; \
+        awk -v OFS='\\t' -v c={wildcards.chromosome} '$1==c {{ print "HER",$2,$3,"3"}}' {input.low_map} | bedtools slop -g {input.fai} -i - -b 10; }} |\
+        bedtools sort -i - |\
+        bedtools merge -d 0 -c 4 -o min | tee {output.hard} |\
+        bedtools complement -L -g {input.fai} -i - | awk -v OFS='\\t' ' {{ print $1,$2,$3,"Normal" }} ' >> {output.normal}
+        cat {output.hard} {output.normal} |\
+        bedtools sort -i - |\
+        sed -e 's/0$/Satellite/' -e 's/2$/Repetitive/' -e 's/1$/Tandem repeat/' -e 's/3$/Low mappability/' > {output.total}
         '''
+
+
+#awk -v OFS='\\t' '{{ print $1,$2,$3,"2" }} ' {input.TR}; \
 
 rule stratify_jasmine_repeats:
     input:
         vcf = rules.jasmine.output,
-        repeats = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True)
+        annotation = expand(rules.generate_genome_annotation.output['total'],sample=get_reference_ID(),allow_missing=True)
     output:
-        non_repetitive = 'vcfs/jasmine/{chromosome}.{_group,calls|all}.{setting}.non_repetitive.vcf',
-        repetitive = 'vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf'
+        'vcfs/jasmine/{chromosome}.{_group}.{setting}.stat'
     resources:
         walltime = '10m'
     params:
         overlap = 0.5
     shell:
         '''
-        grep -v "SUPP_VEC=00001" {input.vcf} |\
-        bedtools subtract -A -f {params.overlap} -a - -b {input.repeats} > {output.non_repetitive}
-        grep -v "SUPP_VEC=00001" {input.vcf} |\
-        bedtools intersect -u -f {params.overlap} -a - -b {input.repeats} > {output.repetitive}
+        bcftools annotate -x ^INFO/SUPP_VEC {input.vcf} |\
+        bcftools annotate -a {input.annotation} -c CHROM,FROM,TO,CLASS -H '##INFO=<ID=CLASS,Number=1,Type=String,Description="Genomic region">' |\
+        grep -oP "(SUPP_VEC=\K\d+|CLASS=\K[^\\t]+)" |paste -d "\\t"  - - |\
+        awk -v OFS='\\t' -F '\\t' ' {{ ++A[$2][$1] }} END {{ for (c in A) {{ for (k in A[c]) {{ print c,k,A[c][k] }} }} }}' > {output}
         '''
 
 localrules: summarise_jasmine
 rule summarise_jasmine:
     input:
-        non_repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.non_repetitive.vcf',chromosome=range(1,30),allow_missing=True),
-        repetitive = expand('vcfs/jasmine/{chromosome}.{_group}.{setting}.repetitive.vcf',chromosome=range(1,30),allow_missing=True)
+        repetitive = expand(rules.stratify_jasmine_repeats.output[0],chromosome=range(1,30),allow_missing=True)
     output:
         'vcfs/jasmine/{_group}.{setting}.stat'
     shell:
         '''
-        grep -hoP "SUPP_VEC=\K\d+" {input.non_repetitive} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print "non_repetitive",k,A[k] }} }}' > {output}
-        grep -hoP "SUPP_VEC=\K\d+" {input.repetitive} | mawk '{{A[$1]+=1}} END {{ for (k in A) {{ print "repetitive",k,A[k] }} }}' >> {output}
+        awk -v OFS='\\t' -F '\\t' ' {{ A[$1][$2]+=$3 }} END {{ for (c in A) {{ for (k in A[c]) {{ print c,k,A[c][k] }} }} }}' {input} > {output}
         '''
 
 rule bcftools_isec:
     input:
-        expand('vcfs/{pangenome}/{{chromosome}}.small.vcf.gz',pangenome=get_variants('base-level'))
+        vcfs = expand('vcfs/{pangenome}/{{chromosome}}.small.vcf.gz',pangenome=get_variants('base-level')),
+        annotation = expand(rules.generate_genome_annotation.output['total'],sample=get_reference_ID(),allow_missing=True)
     output:
         'vcfs/isec/{chromosome}.{mode}.isec'
     threads: 2
@@ -132,18 +136,21 @@ rule bcftools_isec:
         mem_mb = 1500
     shell:
         '''
-        bcftools isec -c {wildcards.mode} --threads {threads} -n +1 -o {output} {input}
+        bcftools isec -c {wildcards.mode} --threads {threads} -n +1 {input.vcfs} |\
+        awk -v OFS='\\t' 'length($3)==1&&length($4)==1 {{ print $1,$2,$2+1,$5,"SNP";next }} {{ if ($3~/,/||$4~/,/) {{ print $1,$2,$2+1,$5,"MA" }} else {{ print $1,$2,$2+1,$5,"Indel" }} }}' |\
+        bedtools intersect -wao -a - -b {input.annotation} |\
+        awk -v OFS='\\t' -F '\\t' ' {{ ++A[$5][$9][$4] }} END {{ for (v in A) {{ for (c in A[v]) {{ for (t in A[v][c]) {{print v,c,t,A[v][c][t] }} }} }} }} ' > {output}
         '''
 
 localrules: count_isec_overlaps
 rule count_isec_overlaps:
     input:
-        expand(rules.bcftools_isec.output,chromosome=range(1,30),allow_missing=True)
+        isec = expand(rules.bcftools_isec.output,chromosome=range(1,30),allow_missing=True),
     output:
         'vcfs/isec/{mode}.txt'
     shell:
         '''
-        mawk 'length($3)==1&&length($4)==1 {{SNP[$5]+=1;next}} {{ if ($3~/,/||$4~/,/) {{MULTI[$5]+=1}} else {{INDEL[$5]+=1}} }} END {{for (key in SNP) {{ print "SNP",key,SNP[key]}} for (key in INDEL) {{ print "INDEL",key,INDEL[key] }} for (key in MULTI) {{ print "MULTI",key,MULTI[key]}} }}' {input} > {output}
+        awk -v OFS='\\t' -F '\\t' ' {{ A[$1][$2][$3]+=$4 }} END {{ for (c in A) {{ for (k in A[c]) {{ for (t in A[c][k]) {{ print c,k,t,A[c][k][t] }} }} }} }}' {input} > {output}
         '''
 
 
