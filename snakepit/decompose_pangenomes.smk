@@ -6,7 +6,7 @@ rule vg_deconstruct:
     threads: 6
     resources:
         mem_mb= 5000,
-        walltime= '4:00'
+        walltime= '4h'
     params:
         ref_path = get_reference_ID()
     shell:
@@ -25,7 +25,7 @@ rule vcfwave:
     threads: 1
     resources:
         mem_mb= 15000,
-        walltime= '120:00'
+        walltime= '120h'
     params:
         skip_size = config.get('skip_size',0)
     shell:
@@ -88,7 +88,7 @@ rule minimap2_align:
     threads: 1
     resources:
         mem_mb= 10000,
-        walltime= '4:00'
+        walltime= '4h'
     shell:
         '''
         minimap2 -cx {params.preset} -t {threads} \
@@ -105,7 +105,7 @@ rule paftools_call:
     threads: 1
     resources:
         mem_mb = 2000,
-        walltime = '1:00'
+        walltime = '1h'
     shell:
         '''
         paftools.js call -f {input.reference} -s {wildcards.sample} {input.paf} > {output}

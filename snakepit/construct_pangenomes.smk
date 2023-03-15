@@ -36,7 +36,7 @@ rule repeatmasker_soft:
     threads: 8
     resources:
         mem_mb = 1000,
-        walltime = '24:00'
+        walltime = '24h'
     shell:
         '''
         RepeatMasker -pa $(({threads}/2)) -no_is -qq -xsmall \
@@ -70,7 +70,7 @@ rule mash_triangle:
     threads: 6
     resources:
         mem_mb = 2500,
-        walltime = '4:00'
+        walltime = '4h'
     shell:
         '''
         mash triangle -s 10000 -k 25 -p {threads} {input} | awk 'NR>1' > {output}
@@ -109,7 +109,7 @@ rule minigraph_construct:
     threads: 1
     resources:
         mem_mb = 20000,
-        walltime = '24:00'
+        walltime = '24h'
     params:
         sample_order = lambda wildcards, input:make_minigraph_order(input.mash_distances[0],input.assemblies),
         L = config['minigraph']['L'],
@@ -159,7 +159,7 @@ rule pggb_construct:
     threads: 16
     resources:
         mem_mb = 4000,
-        walltime = '24:00',
+        walltime = '24h',
         scratch = '30G'
     params:
         pggb = config['pggb']['container'],
@@ -226,7 +226,7 @@ rule cactus_construct:
     threads: 18
     resources:
         mem_mb = 3000,
-        walltime = '4:00',
+        walltime = '4h',
         scratch = '50G'
     params:
         _asmDir = lambda wildcards, input: Path(input.assemblies[0]).parent.parent.resolve(),
@@ -249,7 +249,7 @@ rule cactus_convert:
     threads: 1
     resources:
         mem_mb = 35000,
-        walltime = '4:00'
+        walltime = '4h'
     params:
         _dir = lambda wildcards, output: Path(output[0]).parent.resolve(),
         cactus = config['cactus']['container']
