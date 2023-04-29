@@ -10,7 +10,7 @@ all_samples = config['all_samples']
 
 wildcard_constraints:
     chromosome = r'\d+',
-    pangenome = r'pggb|cactus|minigraph|assembly|miniwaf'
+    pangenome = r'pggb|cactus|minigraph|assembly|miniwaf|linear'
 
 include: 'snakepit/utility.py'
 include: 'snakepit/construct_pangenomes.smk'
@@ -35,5 +35,6 @@ rule all:
         #expand('edit_distance/{sample}.{chromosome}.{pangenome}.{preset}.{trimmed}.stat',sample=additional_samples,chromosome=range(1,30),pangenome=('minigraph','pggb','cactus'),trimmed=('trimmed','untrimmed'),preset='lenient'),
         #VNTRs
         expand('VNTRs/{pangenome}/{chromosome}.VNTR.counts',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30)),
+        expand('VNTRs/{pangenome}/VNTR.depths',pangenome=('minigraph','pggb','cactus')),#,chromosome=range(1,30)),
         #Repeats
         expand('graphs/{pangenome}/{chromosome}.fa.masked',pangenome=('minigraph','pggb','cactus'),chromosome=range(1,30))
