@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7891567.svg)](https://doi.org/10.5281/zenodo.7891567) ![Build](https://github.com/AnimalGenomicsETH/superpangenome_construction/actions/workflows/snakemake.yaml/badge.svg)
 # Graph construction method impacts variation representation and analyses in a bovine super-pangenome
 
 This work focuses on comparing pangenome constructions methods for the downstream implications of how well (and truthfully) variation is converted into currently-useful formats like VCF.
