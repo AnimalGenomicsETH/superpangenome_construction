@@ -29,7 +29,8 @@ TR_divergence_limit: 0.25
 timeout: 150
 
 repeat_library: 'repeats.fasta'
-
+#re-use repeat file for simplicity
+low_mapability: 'low_mappability'
 optical_map_URL: 'https://zenodo.org/record/6854879/files/Merged_minQ20_maxDist1000.vcf.gz'
 
 graphaligner_parameters:

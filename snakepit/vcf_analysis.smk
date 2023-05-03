@@ -73,7 +73,7 @@ rule generate_genome_annotation:
     input:
         masked = expand('assemblies/{chromosome}/{sample}.fa_rm.bed',sample=get_reference_ID(),allow_missing=True),
         TR = expand('VNTRs/TRF/{sample}.{chromosome}.TRF',sample=get_reference_ID(),allow_missing=True),
-        low_map = '/cluster/work/pausch/alex/Xena_stuff_for_now/low_mappability.75.merged25.bed',
+        low_map = config['low_mappability'],
         fai = expand('assemblies/{chromosome}/{sample}.fa.fai',sample=get_reference_ID(),allow_missing=True)
     output:
         total = 'vcfs/genome_annotation.{chromosome}.bed',
